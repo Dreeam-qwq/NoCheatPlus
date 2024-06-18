@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
+import fr.neatmonster.nocheatplus.compat.BridgePotionEffect;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -1434,7 +1435,7 @@ public class SurvivalFly extends Check {
                 if (sprinting && hAllowedDistance < 0.29 && cc.sfSlownessSprintHack 
                     && (
                         // TODO: Test/balance thresholds (walkSpeed, attrMod).
-                        player.hasPotionEffect(PotionEffectType.SLOW)
+                        player.hasPotionEffect(BridgePotionEffect.SLOWNESS)
                         || data.walkSpeed < Magic.DEFAULT_WALKSPEED
                         || attrMod < 1.0
                     )) {

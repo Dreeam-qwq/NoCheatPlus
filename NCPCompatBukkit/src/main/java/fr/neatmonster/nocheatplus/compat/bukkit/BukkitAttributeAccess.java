@@ -16,6 +16,7 @@ package fr.neatmonster.nocheatplus.compat.bukkit;
 
 import java.util.UUID;
 
+import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
@@ -55,9 +56,9 @@ public class BukkitAttributeAccess implements IAttributeAccess {
      * @param id
      * @return
      */
-    private AttributeModifier getModifier(final AttributeInstance attrInst, final UUID id) {
+    private AttributeModifier getModifier(final AttributeInstance attrInst, final NamespacedKey id) {
         for (final AttributeModifier mod : attrInst.getModifiers()) {
-            if (id.equals(mod.getUniqueId())) {
+            if (id.equals(mod.getKey())) {
                 return mod;
             }
         }
