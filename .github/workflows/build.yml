@@ -2,7 +2,7 @@ name: Build NoCheatPlus
 
 on:
   push:
-    branches: [ master ]
+    branches: [ feat/1.21hotfix ]
 
 jobs:
   build:
