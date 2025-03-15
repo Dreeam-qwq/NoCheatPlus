@@ -80,6 +80,10 @@ public class MovingFlying extends BaseAdapter {
     public static final int indexStance = 3;
     public static final int indexYaw = 0;
     public static final int indexPitch = 1;
+
+    // Setup for teleport accept packet
+    private static PacketType confirmTeleportType;
+    private static boolean acceptConfirmTeleportPackets;
     
     private final Plugin plugin = Bukkit.getPluginManager().getPlugin("NoCheatPlus");
     private static PacketType[] initPacketTypes() {
@@ -95,11 +99,19 @@ public class MovingFlying extends BaseAdapter {
         else types.add(PacketType.Play.Client.GROUND);
         // Add confirm teleport.
         // PacketPlayInTeleportAccept
-        PacketType confirmType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY, Sender.CLIENT, "TeleportAccept");
-        if (confirmType != null && ServerVersion.compareMinecraftVersion("1.9") >= 0) {
-            StaticLog.logInfo("Confirm teleport packet available (via name): " + confirmType);
-            types.add(confirmType);
+        confirmTeleportType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY,  Sender.CLIENT, "AcceptTeleportation");
+        if (confirmTeleportType == null) { // Fallback check for the old packet name.
+            confirmTeleportType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY, Sender.CLIENT, "TeleportAccept");
         }
+
+        if (confirmTeleportType != null && ServerVersion.compareMinecraftVersion("1.9") >= 0) {
+            StaticLog.logInfo("Confirm teleport packet available (via name): " + confirmTeleportType);
+            types.add(confirmTeleportType);
+            acceptConfirmTeleportPackets = true;
+        } else {
+            acceptConfirmTeleportPackets = false;
+        }
+
         return types.toArray(new PacketType[types.size()]);
     }
 
@@ -113,8 +125,6 @@ public class MovingFlying extends BaseAdapter {
     private long packetMismatch = Long.MIN_VALUE;
     private long packetMismatchLogFrequency = 60000; // Every minute max, good for updating :).
     private final HashSet<PACKET_CONTENT> validContent = new LinkedHashSet<PACKET_CONTENT>();
-    private final PacketType confirmTeleportType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY, Sender.CLIENT, "TeleportAccept");
-    private boolean acceptConfirmTeleportPackets = confirmTeleportType != null;
 
     public MovingFlying(Plugin plugin) {
         // PacketPlayInFlying[3, legacy: 10]
@@ -332,7 +342,8 @@ public class MovingFlying extends BaseAdapter {
 
         final PacketContainer packet = event.getPacket();
         final List<Boolean> booleans = packet.getBooleans().getValues();
-        if (booleans.size() != 3) {
+        if (booleans.size() != 3 && booleans.size() != 4) {
+            // 4: 1.21.3 onwards
             packetMismatch(event);
             return null;
         }
