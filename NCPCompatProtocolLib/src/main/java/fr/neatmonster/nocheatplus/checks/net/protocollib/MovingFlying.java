@@ -81,10 +81,10 @@ public class MovingFlying extends BaseAdapter {
     public static final int indexYaw = 0;
     public static final int indexPitch = 1;
 
-    // Setup for teleport accept packet
+    // Setup for teleport accept packet.
     private static PacketType confirmTeleportType;
     private static boolean acceptConfirmTeleportPackets;
-    
+
     private final Plugin plugin = Bukkit.getPluginManager().getPlugin("NoCheatPlus");
     private static PacketType[] initPacketTypes() {
         final List<PacketType> types = new LinkedList<PacketType>(Arrays.asList(
@@ -99,7 +99,7 @@ public class MovingFlying extends BaseAdapter {
         else types.add(PacketType.Play.Client.GROUND);
         // Add confirm teleport.
         // PacketPlayInTeleportAccept
-        confirmTeleportType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY,  Sender.CLIENT, "AcceptTeleportation");
+        confirmTeleportType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY, Sender.CLIENT, "AcceptTeleportation");
         if (confirmTeleportType == null) { // Fallback check for the old packet name.
             confirmTeleportType = ProtocolLibComponent.findPacketTypeByName(Protocol.PLAY, Sender.CLIENT, "TeleportAccept");
         }
