@@ -1,5 +1,6 @@
 > [!WARNING]  
-> Personal fork, **DO NOT** use in the production!
+> Personal fork, doesn't contain any real new features compared to original NCP \
+> **DO NOT** use in the production!
 
 NoCheatPlus
 ---------
