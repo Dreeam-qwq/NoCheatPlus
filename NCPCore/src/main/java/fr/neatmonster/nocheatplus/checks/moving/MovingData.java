@@ -154,10 +154,20 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
 
     // *----------Move / Vehicle move tracking----------*
     /** Keep track of currently processed (if) and past moves for player moving. Stored moves can be altered by modifying the int. */
-    public final MoveTrace <PlayerMoveData> playerMoves = new MoveTrace<>(PlayerMoveData::new, 6);
+    public final MoveTrace <PlayerMoveData> playerMoves = new MoveTrace<PlayerMoveData>(new Callable<PlayerMoveData>() {
+        @Override
+        public PlayerMoveData call() throws Exception {
+            return new PlayerMoveData();
+        }
+    }, 6); 
     /** Keep track of currently processed (if) and past moves for vehicle moving. Stored moves can be altered by modifying the int. */
     // TODO: There may be need to store such data with vehicles, or detect tandem abuse in a different way.
-    public final MoveTrace <VehicleMoveData> vehicleMoves = new MoveTrace<>(VehicleMoveData::new, 2);
+    public final MoveTrace <VehicleMoveData> vehicleMoves = new MoveTrace<VehicleMoveData>(new Callable<VehicleMoveData>() {
+        @Override
+        public VehicleMoveData call() throws Exception {
+            return new VehicleMoveData();
+        }
+    }, 2);
 
     // *----------Velocity handling----------* 
     /** Tolerance value for using vertical velocity (the client sends different values than received with fight damage). */

@@ -71,7 +71,8 @@ public class SetBackStorage {
     public SetBackEntry getOldestValidEntry() {
         int oldestTime = Integer.MAX_VALUE;
         SetBackEntry oldestEntry = null;
-        for (final SetBackEntry entry : entries) {
+        for (int i = 0; i < entries.length; i++) {
+            final SetBackEntry entry = entries[i];
             if (entry.isValid() && entry.getTime() < oldestTime) {
                 oldestTime = entry.getTime();
                 oldestEntry = entry;
@@ -88,7 +89,8 @@ public class SetBackStorage {
     public SetBackEntry getLatestValidEntry() {
         int latestTime = 0;
         SetBackEntry latestEntry = null;
-        for (final SetBackEntry entry : entries) {
+        for (int i = 0; i < entries.length; i++) {
+            final SetBackEntry entry = entries[i];
             if (entry.isValid() && entry.getTime() > latestTime) {
                 latestTime = entry.getTime();
                 latestEntry = entry;
@@ -125,7 +127,8 @@ public class SetBackStorage {
      * @return
      */
     public SetBackEntry getFirstValidEntry(final Location location) {
-        for (final SetBackEntry entry : entries) {
+        for (int i = 0; i < entries.length; i++) {
+            final SetBackEntry entry = entries[i];
             if (entry.isValid() && TrigUtil.isSamePosAndLook(entry, location)) {
                 return entry;
             }
@@ -134,8 +137,8 @@ public class SetBackStorage {
     }
 
     public void invalidateAll() {
-        for (SetBackEntry entry : entries) {
-            entry.setValid(false);
+        for (int i = 0; i < entries.length; i++) {
+            entries[i].setValid(false);
         }
     }
 
@@ -147,8 +150,8 @@ public class SetBackStorage {
      */
     public void resetAll(final Location loc) {
         time ++;
-        for (SetBackEntry entry : entries) {
-            entry.set(loc, time, Monotonic.millis());
+        for (int i = 0; i < entries.length; i++) {
+            entries[i].set(loc, time, Monotonic.millis());
         }
     }
 
@@ -160,8 +163,8 @@ public class SetBackStorage {
      */
     public void resetAll(final IGetLocationWithLook loc) {
         time ++;
-        for (SetBackEntry entry : entries) {
-            entry.set(loc, time, Monotonic.millis());
+        for (int i = 0; i < entries.length; i++) {
+            entries[i].set(loc, time, Monotonic.millis());
         }
     }
 
@@ -199,9 +202,9 @@ public class SetBackStorage {
 
     public void resetByWorldName(final String worldName) {
         // TODO: Not needed for memory leaks, possibly tie resetAll to a global world?
-        for (SetBackEntry entry : entries) {
-            if (worldName.equals(entry.getWorldName())) {
-                entry.setValid(false);
+        for (int i = 0; i < entries.length; i++) {
+            if (worldName.equals(entries[i].getWorldName())) {
+                entries[i].setValid(false);
             }
         }
     }
@@ -212,8 +215,8 @@ public class SetBackStorage {
      * @return
      */
     public boolean isAnyEntryValid() {
-        for (SetBackEntry entry : entries) {
-            if (entry.isValid()) {
+        for (int i = 0; i < entries.length; i++) {
+            if (entries[i].isValid()) {
                 return true;
             }
         }

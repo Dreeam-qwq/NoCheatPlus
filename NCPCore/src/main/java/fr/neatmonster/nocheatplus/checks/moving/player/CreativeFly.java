@@ -95,7 +95,7 @@ public class CreativeFly extends Check {
         final boolean flying = gameMode == BridgeMisc.GAME_MODE_SPECTATOR || player.isFlying();
         final boolean sprinting = player.isSprinting();
 
-        // Allow elytra fly (not packet mode)
+        // Dreeam start - Allow elytra fly (not packet mode)
         // Since in Winds Anarchy, we have another plugin to handle elyta fly better.
         if (pData.hasPermission(Permissions.MOVING_ELYTRAFLY, player)
                 && player.getInventory().getChestplate() != null && player.getInventory().getChestplate().getType() == Material.ELYTRA && player.isGliding()) {
@@ -113,6 +113,7 @@ public class CreativeFly extends Check {
             }
             return null;
         }
+        // Dreeam end - Allow elytra fly (not packet mode)
 
         // Lost ground, if set so.
         if (model.getGround()) {

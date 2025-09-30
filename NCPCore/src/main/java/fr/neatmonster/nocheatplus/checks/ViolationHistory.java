@@ -45,7 +45,7 @@ public class ViolationHistory {
         /**
          * Descending sort by time.
          */
-        public static final Comparator<ViolationLevel> VLComparator = Comparator.comparingLong(vl -> vl.time);
+        public static Comparator<ViolationLevel> VLComparator = Comparator.comparingLong(vl -> vl.time);
 
         /** The check. */
         public final String check;
@@ -278,7 +278,8 @@ public class ViolationHistory {
      * @return ViolationLevel instance, if present. Otherwise null.
      */
     public ViolationLevel getViolationLevel(final CheckType type) {
-        for (final ViolationLevel vl : violationLevels) {
+        for (int i = 0; i < violationLevels.size(); i++) {
+            final ViolationLevel vl = violationLevels.get(i);
             if (checkTypeMap.get(vl.check) == type) {
                 return vl;
             }

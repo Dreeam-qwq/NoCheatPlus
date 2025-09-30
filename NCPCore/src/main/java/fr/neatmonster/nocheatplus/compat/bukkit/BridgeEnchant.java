@@ -187,8 +187,9 @@ public final class BridgeEnchant {
         }
         final PlayerInventory inv = player.getInventory();
         final ItemStack[] contents = inv.getArmorContents();
-        for (final ItemStack stack : contents) {
-            if (stack != null && stack.getEnchantmentLevel(enchantment) > 0) {
+        for (int i = 0; i < contents.length; i++){
+            final ItemStack stack = contents[i];
+            if (stack != null && stack.getEnchantmentLevel(enchantment) > 0){
                 return true;
             }
         }
