@@ -252,8 +252,8 @@ public class ActionFrequency {
         // TODO: Backwards-compatible lastUpdate ?
         final StringBuilder buffer = new StringBuilder(50);
         buffer.append(buckets.length + ","+durBucket+","+time);
-        for (float bucket : buckets) {
-            buffer.append("," + bucket);
+        for (int i = 0; i < buckets.length; i++) {
+            buffer.append("," + buckets[i]);
         }
         return buffer.toString();
     }
@@ -267,7 +267,8 @@ public class ActionFrequency {
      * @param freqs
      */
     public static void reduce(final long time, final float amount, final ActionFrequency... freqs) {
-        for (final ActionFrequency freq : freqs) {
+        for (int i = 0; i < freqs.length; i++) {
+            final ActionFrequency freq = freqs[i];
             freq.update(time);
             freq.setBucket(0, Math.max(0f, freq.bucketScore(0) - amount));
         }
@@ -282,7 +283,8 @@ public class ActionFrequency {
      * @param freqs
      */
     public static void subtract(final long time, final float amount, final ActionFrequency... freqs) {
-        for (final ActionFrequency freq : freqs) {
+        for (int i = 0; i < freqs.length; i++) {
+            final ActionFrequency freq = freqs[i];
             freq.update(time);
             freq.setBucket(0, freq.bucketScore(0) - amount);
         }

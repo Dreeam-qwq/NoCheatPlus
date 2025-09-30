@@ -159,8 +159,11 @@ public abstract class AbstractCoordHashMap<V, E extends fr.neatmonster.nocheatpl
         final int absHash = Math.abs(hash);
         int slot = absHash % entries.length;
         final List<E> bucket = entries[slot];
-        if (bucket != null) {
-            final Iterator<E> it = bucket.iterator();
+        if (bucket == null) {
+            return null;
+        }
+        else {
+            final Iterator<E> it = bucket.iterator(); 
             while (it.hasNext()) {
                 final E entry = it.next();
                 if (entry.hash == hash && x == entry.x && z == entry.z && y == entry.y) {
@@ -173,8 +176,8 @@ public abstract class AbstractCoordHashMap<V, E extends fr.neatmonster.nocheatpl
                     return entry.value;
                 }
             }
+            return null;
         }
-        return null;
     }
 
     private void resize(final int size) {

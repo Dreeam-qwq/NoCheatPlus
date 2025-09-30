@@ -80,8 +80,8 @@ public class ActionAccumulator {
      */
     public float score() {
         float score = 0;
-        for (float bucket : buckets) {
-            score += bucket;
+        for (int i = 0; i < buckets.length; i++) {
+            score += buckets[i];
         }
         return score;
     }

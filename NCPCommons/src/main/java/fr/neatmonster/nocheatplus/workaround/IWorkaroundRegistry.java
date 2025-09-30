@@ -78,9 +78,9 @@ public interface IWorkaroundRegistry {
          */
         public WorkaroundSet(final IWorkaround[] bluePrints, final Map<String, String[]> groups) {
             // Add new instances to workaroundsById and stagedWorkarounds.
-            final ArrayList<IWorkaround> stagedWorkarounds = new ArrayList<>(bluePrints.length);
-            for (IWorkaround bluePrint : bluePrints) {
-                final IWorkaround workaround = bluePrint.getNewInstance();
+            final ArrayList<IWorkaround> stagedWorkarounds = new ArrayList<IWorkaround>(bluePrints.length);
+            for (int i = 0; i < bluePrints.length; i++) {
+                final IWorkaround workaround = bluePrints[i].getNewInstance();
                 workaroundsById.put(workaround.getId(), workaround);
                 if (workaround instanceof IStagedWorkaround) {
                     stagedWorkarounds.add(workaround);
@@ -147,8 +147,8 @@ public interface IWorkaroundRegistry {
          * WorkaroundCounter instances (sub classes get reset too).
          */
         public void resetConditions() {
-            for (IStagedWorkaround stagedWorkaround : stagedWorkarounds) {
-                stagedWorkaround.resetConditions();
+            for (int i = 0; i < stagedWorkarounds.length; i++) {
+                stagedWorkarounds[i].resetConditions();
             }
         }
 
@@ -162,8 +162,8 @@ public interface IWorkaroundRegistry {
             if (this.stagedGroups != null) {
                 final IStagedWorkaround[] workarounds = stagedGroups.get(groupId);
                 if (workarounds != null) {
-                    for (IStagedWorkaround workaround : workarounds) {
-                        workaround.resetConditions();
+                    for (int i = 0; i < workarounds.length; i++) {
+                        workarounds[i].resetConditions();
                     }
                 }
             }

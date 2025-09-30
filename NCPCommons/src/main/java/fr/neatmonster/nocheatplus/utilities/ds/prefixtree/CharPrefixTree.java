@@ -45,10 +45,10 @@ public class CharPrefixTree<N extends CharNode<N>, L extends CharLookupEntry<N>>
      * @param chars
      * @return
      */
-    public static List<Character> toCharacterList(final char[] chars){
-        final List<Character> characters = new ArrayList<>(chars.length);
-        for (char aChar : chars) {
-            characters.add(aChar);
+    public static final List<Character> toCharacterList(final char[] chars){
+        final List<Character> characters = new ArrayList<Character>(chars.length);
+        for (int i = 0; i < chars.length; i++){
+            characters.add(chars[i]);
         }
         return characters;
     }
@@ -136,7 +136,8 @@ public class CharPrefixTree<N extends CharNode<N>, L extends CharLookupEntry<N>>
         final L result = lookup(input, false);
         if (!result.hasPrefix) return false;
         if (input.length() == result.depth) return true;
-        return Character.isWhitespace(input.charAt(result.depth));
+        if (Character.isWhitespace(input.charAt(result.depth))) return true;
+        return false;
     }
 
     /**
@@ -147,8 +148,8 @@ public class CharPrefixTree<N extends CharNode<N>, L extends CharLookupEntry<N>>
      *         inputs, false otherwise.
      */
     public boolean hasAnyPrefixWords(final String... inputs){
-        for (String input : inputs) {
-            if (hasPrefixWords(input)) {
+        for (int i = 0; i < inputs.length; i++){
+            if (hasPrefixWords(inputs[i])){
                 return true;
             }
         }
@@ -210,6 +211,6 @@ public class CharPrefixTree<N extends CharNode<N>, L extends CharLookupEntry<N>>
      * @return
      */
     public static CharPrefixTree<SimpleCharNode, CharLookupEntry<SimpleCharNode>> newCharPrefixTree(){
-        return new CharPrefixTree<SimpleCharNode, CharLookupEntry<SimpleCharNode>>(parent -> new SimpleCharNode(), CharLookupEntry::new);
+        return new CharPrefixTree<>(parent -> new SimpleCharNode(), CharLookupEntry::new);
     }
 }

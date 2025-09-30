@@ -40,8 +40,8 @@ public class FCFSComparator <T> implements Comparator<T> {
 
     @Override
     public int compare(T o1, T o2) {
-        for (Comparator<T> comparator : comparators) {
-            final int res = comparator.compare(o1, o2);
+        for (int i = 0; i < comparators.size(); i++) {
+            final int res = comparators.get(i).compare(o1, o2);
             if (res != 0) {
                 return reverse ? -res : res;
             }
