@@ -147,7 +147,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
                  */
                 @EventHandler(priority = EventPriority.MONITOR)
                 public void onInputChange(final PlayerInputEvent event) {
-                    handleInputs(event.getInput(), event.getPlayer());
+                    onChangeOfInput(event.getInput(), event.getPlayer());
                 }
             });
         }
@@ -155,7 +155,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
             queuedComponents.add(new Listener() {
                 @EventHandler(priority = EventPriority.MONITOR)
                 public void onTridentRelease(final PlayerRiptideEvent event) {
-                    handleRiptide(event.getPlayer(), event.getVelocity().clone());
+                    onReleasingTrident(event.getPlayer(), event.getVelocity().clone());
                 }
            });
         }
@@ -182,7 +182,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
      * @param player 
      * @param vel Riptide velocity.
      */
-    public void handleRiptide(Player player, Vector vel) {
+    public void onReleasingTrident(Player player, Vector vel) {
         final IPlayerData pData = DataManager.getPlayerData(player);
         final MovingData data = pData.getGenericInstance(MovingData.class);
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
@@ -197,7 +197,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
      * @param bukkitInput Input from the event.
      * @param player
      */
-    public void handleInputs(Input bukkitInput, Player player) {
+    public void onChangeOfInput(Input bukkitInput, Player player) {
         // TODO: Consider using packet input to tell which normal move change the input? But it require looping through packets. This should perform better on changing dir in normal moves
         final IPlayerData pData = DataManager.getPlayerData(player);
         final MovingData data = pData.getGenericInstance(MovingData.class);
