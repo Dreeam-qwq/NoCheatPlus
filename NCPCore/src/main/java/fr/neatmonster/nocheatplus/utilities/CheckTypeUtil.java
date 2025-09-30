@@ -65,8 +65,13 @@ public class CheckTypeUtil {
 
         // Direct children only.
         for (final CheckType parent : map.keySet()) {
-            final Set<CheckType> set = new LinkedHashSet<>(map.get(parent));
-            set.removeIf(checkType -> checkType.getParent() != parent);
+            final Set<CheckType> set = new LinkedHashSet<CheckType>(map.get(parent));
+            final Iterator<CheckType> it = set.iterator();
+            while (it.hasNext()) {
+                if (it.next().getParent() != parent) {
+                    it.remove();
+                }
+            }
             directChildrenMap.put(parent, Collections.unmodifiableSet(set));
         }
 

@@ -212,13 +212,14 @@ public class PassengerUtil {
         data.isVehicleSetBack = true;
         int otherPlayers = 0;
         boolean playerIsOriginalPassenger = false;
-        for (Entity originalPassenger : originalPassengers) {
-            if (originalPassenger.equals(player)) {
+        for (int i = 0; i < originalPassengers.length; i++) { 
+            if (originalPassengers[i].equals(player)) {
                 playerIsOriginalPassenger = true;
                 break;
-            } else if (originalPassenger instanceof Player) {
-                DataManager.getGenericInstance((Player) originalPassenger, MovingData.class).isVehicleSetBack = true;
-                otherPlayers++;
+            }
+            else if (originalPassengers[i] instanceof Player) {
+                DataManager.getGenericInstance((Player) originalPassengers[i], MovingData.class).isVehicleSetBack = true;
+                otherPlayers ++;
             }
         }
         boolean redoPassengers = true; // false; // Some time in the future a teleport might work directly.
@@ -282,7 +283,8 @@ public class PassengerUtil {
                 teleportPlayerPassenger(player, vehicle, location, vehicleTeleported, data, debug);
             }
             // Add all other original passengers in a generic way, distinguish players.
-            for (final Entity passenger : originalPassengers) {
+            for (int i = 0; i < originalPassengers.length; i++) {
+                final Entity passenger = originalPassengers[i];
                 if (passenger.isValid() && !passenger.isDead() && vWorldMatchesPWorld) {
 
                     // Cross world cases? -> Seems like it :)

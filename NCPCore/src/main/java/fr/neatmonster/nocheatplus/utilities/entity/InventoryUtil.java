@@ -122,8 +122,8 @@ public class InventoryUtil {
     public static int getFreeSlots(final Inventory inventory) {
         final ItemStack[] contents = inventory.getContents();
         int count = 0;
-        for (ItemStack content : contents) {
-            if (BlockProperties.isAir(content)) {
+        for (int i = 0; i < contents.length; i++) {
+            if (BlockProperties.isAir(contents[i])) {
                 count ++;
             }
         }
@@ -147,7 +147,8 @@ public class InventoryUtil {
         final int durability = reference.getDurability();
         final ItemStack[] contents = inventory.getContents();
         int count = 0;
-        for (final ItemStack stack : contents) {
+        for (int i = 0; i < contents.length; i++) {
+            final ItemStack stack = contents[i];
             if (stack == null) {
                 continue;
             }

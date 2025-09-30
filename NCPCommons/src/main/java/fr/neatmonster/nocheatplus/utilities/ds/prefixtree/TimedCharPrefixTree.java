@@ -96,7 +96,7 @@ public class TimedCharPrefixTree<N extends TimedCharNode<N>, L extends TimedChar
 	 * @return
 	 */
 	public static TimedCharPrefixTree<SimpleTimedCharNode, TimedCharLookupEntry<SimpleTimedCharNode>> newTimedCharPrefixTree(final boolean access) {
-		return new TimedCharPrefixTree<>(
+		return new TimedCharPrefixTree<SimpleTimedCharNode, TimedCharLookupEntry<SimpleTimedCharNode>>(
                 parent -> {
                     final long ts;
                     if (parent == null) ts = System.currentTimeMillis();

@@ -289,6 +289,6 @@ public class PrefixTree<K, N extends Node<K, N>, L extends LookupEntry<K, N>>{
 	 * @return
 	 */
 	public static <K> PrefixTree<K, SimpleNode<K>, LookupEntry<K, SimpleNode<K>>> newPrefixTree(){
-		return new PrefixTree<>(parent -> new SimpleNode<K>(), LookupEntry::new);
+		return new PrefixTree<K, SimpleNode<K>, LookupEntry<K, SimpleNode<K>>>(parent -> new SimpleNode<K>(), LookupEntry::new);
 	}
 }

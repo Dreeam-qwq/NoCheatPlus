@@ -56,7 +56,7 @@ public class PlayerMessageSender extends OnDemandTickListener {
         }
         // Do messaging.
         for (final MessageEntry entry : entries){
-            final Player player = DataManager.getPlayer(entry.playerName);
+            final Player player = DataManager.getPlayerExact(entry.playerName);
             if (player != null && player.isOnline()){
                 player.sendMessage(entry.message);
             }

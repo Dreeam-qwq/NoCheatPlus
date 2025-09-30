@@ -27,6 +27,7 @@ import org.bukkit.entity.Player;
 import fr.neatmonster.nocheatplus.NCPAPIProvider;
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.compat.AlmostBoolean;
+import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
 import fr.neatmonster.nocheatplus.components.config.value.OverrideType;
 import fr.neatmonster.nocheatplus.components.data.*;
 import fr.neatmonster.nocheatplus.hooks.ExemptionContext;
@@ -163,6 +164,8 @@ public class PlayerData implements IPlayerData {
     private boolean requestUpdateInventory = false;
     private boolean requestItemUseResync = false;
     private boolean requestPlayerSetBack = false;
+    private int versionID = -1;
+    private ClientVersion clientVersion = ClientVersion.UNKNOWN;
     private boolean sneaking = false;
     private boolean isShiftKeyPressed = false;
     private boolean sprinting = false;
@@ -457,7 +460,9 @@ public class PlayerData implements IPlayerData {
         sneaking = false;
         sprinting = false;
         isShiftKeyPressed = false;
+        versionID = -1;
         itemInUse = null;
+        clientVersion = ClientVersion.UNKNOWN;
         supportingBlockData = null;
     }
 
@@ -994,150 +999,7 @@ public class PlayerData implements IPlayerData {
         this.checkTypeTree.getNode(checkType).overrideDebug(checkType, active, overrideType, overrideChildren);
     }
 
-    /**
-     * Test if present.
-     * 
-     * @param tag
-     * @return
-     */
-    public boolean hasTag(final String tag) {
-        return tags != null && tags.contains(tag);
-    }
-
-    /**
-     * Add the tag.
-     * 
-     * @param tag
-     */
-    public void addTag(final String tag) {
-        if (tags == null) {
-            tags = new HashSet<String>();
-        }
-        tags.add(tag);
-    }
-
-    /**
-     * Remove the tag.
-     * 
-     * @param tag
-     */
-    public void removeTag(final String tag) {
-        if (tags != null) {
-            tags.remove(tag);
-            if (tags.isEmpty()) {
-                tags = null;
-            }
-        }
-    }
-
-    /**
-     * Add tag or remove tag, based on arguments.
-     * 
-     * @param tag
-     * @param add
-     *            The tag will be added, if set to true. If set to false, the
-     *            tag will be removed.
-     */
-    public void setTag(final String tag, final boolean add) {
-        if (add) {
-            addTag(tag);
-        }
-        else {
-            removeTag(tag);
-        }
-    }
-
-    @Override
-    public boolean getNotifyOff() {
-        return hasTag(TAG_NOTIFY_OFF);
-    }
-
-    @Override
-    public void setNotifyOff(final boolean notifyOff) {
-        setTag(TAG_NOTIFY_OFF, notifyOff);
-    }
-    
-    /**
-     * Set the state player connect through geysermc
-     * 
-     * @param bedrockPlayer
-     */
-    @Override
-    public void setBedrockPlayer(final boolean bedrockPlayer) {
-        this.bedrockPlayer = bedrockPlayer;
-    }
-    
-    /**
-     * Check if player join via geysermc
-     * 
-     * @return
-     */
-    @Override
-    public boolean isBedrockPlayer() {
-        return bedrockPlayer;
-    }
-
-    @Override
-    public void requestUpdateInventory() {
-        this.requestUpdateInventory = true;
-        registerFrequentPlayerTask();
-    }
-
-    @Override
-    public void requestPlayerSetBack() {
-        this.requestPlayerSetBack = true;
-        registerFrequentPlayerTask();
-    }
-
-    @Override
-    public boolean isPlayerSetBackScheduled() {
-        return this.requestPlayerSetBack 
-                && (frequentPlayerTaskShouldBeScheduled || isFrequentPlayerTaskScheduled());
-    }
-
-    /**
-     * Get a data/config instance (1.local cache, 2. player related factory, 3.
-     * world registry).
-     */
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> T getGenericInstance(final Class<T> registeredFor) {
-        // 1. Check for cache (local).
-        final Object res = dataCache.get(registeredFor);
-        if (res == null) {
-            /*
-             * TODO: Consider storing null and check containsKey(registeredFor)
-             * here. On the other hand it's not intended to query non existent
-             * data (just yet).
-             */
-            return cacheMissGenericInstance(registeredFor);
-        }
-        else {
-            return (T) res;
-        }
-    }
-
-    private <T> T cacheMissGenericInstance(final Class<T> registeredFor) {
-        // 2. Check for registered factory (local)
-        // TODO: Might store PlayerDataManager here.
-        T res = DataManager.getFromFactory(registeredFor, 
-                new PlayerFactoryArgument(this, getCurrentWorldDataSafe()));
-        if (res != null) {
-            return  putDataCache(registeredFor, res);
-        }
-        // 3. Check proxy registry.
-        res = getCurrentWorldDataSafe().getGenericInstance(registeredFor);
-        return res == null ? null : putDataCache(registeredFor, res);
-    }
-
-    private <T> T putDataCache(final Class<T> registeredFor, final T instance) {
-        final T previousInstance = (T) dataCache.putIfAbsent(registeredFor, instance); // Under lock.
-        return previousInstance == null ? instance : previousInstance;
-    }
-
-    /**
-     * Remove from cache.
-     */
+    /** Remove from cache. */
     @Override
     public <T> void removeGenericInstance(final Class<T> type) {
         dataCache.remove(type);

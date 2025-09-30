@@ -28,7 +28,7 @@ public class Order {
     /**
      * Comparator for sorting SetupOrder.
      */
-    public static final Comparator<Object> cmpSetupOrder = (obj1, obj2) -> {
+    public static Comparator<Object> cmpSetupOrder = (obj1, obj2) -> {
         int prio1 = 0;
         int prio2 = 0;
         final SetupOrder order1 = obj1.getClass().getAnnotation(SetupOrder.class);

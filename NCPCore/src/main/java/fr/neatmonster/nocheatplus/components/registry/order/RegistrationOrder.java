@@ -90,7 +90,7 @@ public class RegistrationOrder {
      * Compare on base of basePriority. Entries with null priority are sorted to
      * the front.
      */
-    public static final Comparator<RegistrationOrder> cmpBasePriority = (o1, o2) -> {
+    public static Comparator<RegistrationOrder> cmpBasePriority = (o1, o2) -> {
         final Integer p1 = o1.getBasePriority();
         final Integer p2 = o2.getBasePriority();
         if (p1 == null) {

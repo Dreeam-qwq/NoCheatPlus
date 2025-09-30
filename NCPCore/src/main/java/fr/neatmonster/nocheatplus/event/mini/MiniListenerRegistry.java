@@ -114,7 +114,11 @@ public abstract class MiniListenerRegistry<EB, P> {
         } else if (anchor.equals(listener)) {
             throw new IllegalArgumentException("Must not be equal: listener and anchor");
         }
-        Set<MiniListener<? extends EB>> attached = attachments.computeIfAbsent(anchor, k -> new HashSet<>());
+        Set<MiniListener<? extends EB>> attached = attachments.get(anchor);
+        if (attached == null) {
+            attached = new HashSet<MiniListener<? extends EB>>();
+            attachments.put(anchor, attached);
+        }
         attached.add(listener);
     }
 
@@ -139,7 +143,11 @@ public abstract class MiniListenerRegistry<EB, P> {
         if (attached == null) {
             // TODO: throw something or return value or ignore?
         } else {
-            Set<MiniListener<? extends EB>> attached2 = attachments.computeIfAbsent(otherAnchor, k -> new HashSet<>());
+            Set<MiniListener<? extends EB>> attached2 = attachments.get(otherAnchor);
+            if (attached2 == null) {
+                attached2 = new HashSet<MiniListener<? extends EB>>();
+                attachments.put(otherAnchor, attached2);
+            }
             attached2.addAll(attached);
         }
     }
@@ -263,7 +271,11 @@ public abstract class MiniListenerRegistry<EB, P> {
 
         // TODO: Accept RegisterEventsWithOrder (and RegisterWithOrder) with listener.
         // TODO: Accept IRegisterWithOrder with listener.
-        Map<P, MiniListenerNode<? extends EB, P>> prioMap = classMap.computeIfAbsent(eventClass, k -> new HashMap<>());
+        Map<P, MiniListenerNode<? extends EB, P>> prioMap = classMap.get(eventClass);
+        if (prioMap == null) {
+            prioMap = new HashMap<P, MiniListenerNode<? extends EB, P>>();
+            classMap.put(eventClass, prioMap);
+        }
         // TODO: Concept for when to cast.
         @SuppressWarnings("unchecked")
         MiniListenerNode<E, P> node = (MiniListenerNode<E, P>) prioMap.get(basePriority);

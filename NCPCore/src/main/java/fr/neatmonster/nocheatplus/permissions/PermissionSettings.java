@@ -254,9 +254,9 @@ public class PermissionSettings {
         if (ref == null) {
             // Implicit second.
             if (implicitRules != null) {
-                for (PermissionRule implicitRule : implicitRules) {
-                    if (implicitRule.matches(permissionName)) {
-                        ref = implicitRule.getPermissionPolicy();
+                for (int i = 0; i < implicitRules.length; i++) {
+                    if (implicitRules[i].matches(permissionName)) {
+                        ref =implicitRules[i].getPermissionPolicy();
                     }
                 }
             }

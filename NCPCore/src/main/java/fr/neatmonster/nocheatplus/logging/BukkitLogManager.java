@@ -54,12 +54,10 @@ public class BukkitLogManager extends AbstractLogManager implements INotifyReloa
     // TODO: ingame logging [ingame needs api to keep track of players who receive notifications.].
     // TODO: Later: Custom loggers (file, other), per-player-streams (debug per player), custom ingame loggers (one or more players).
 
-    private static final ContentLogger<String> serverLogger = (level, content) -> {
+    private static ContentLogger<String> serverLogger = (level, content) -> {
         try {
             Bukkit.getLogger().log(level, "[NoCheatPlus] " + content);
-        } catch (Throwable t) {
-            //t.printStackTrace();
-        }
+        } catch (Throwable t) {}
     };
 
     protected final Plugin plugin;

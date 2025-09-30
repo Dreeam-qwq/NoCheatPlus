@@ -211,6 +211,6 @@ public class CharPrefixTree<N extends CharNode<N>, L extends CharLookupEntry<N>>
      * @return
      */
     public static CharPrefixTree<SimpleCharNode, CharLookupEntry<SimpleCharNode>> newCharPrefixTree(){
-        return new CharPrefixTree<>(parent -> new SimpleCharNode(), CharLookupEntry::new);
+        return new CharPrefixTree<SimpleCharNode, CharLookupEntry<SimpleCharNode>>(parent -> new SimpleCharNode(), CharLookupEntry::new);
     }
 }

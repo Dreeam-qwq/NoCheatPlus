@@ -41,7 +41,12 @@ public class DefaultPenaltyList implements IPenaltyList {
          * @return True if the list has been emptied, false otherwise.
          */
         private boolean apply(final RI input, final boolean removeAppliedPenalties) {
-            penalties.removeIf(riiPenalty -> riiPenalty.apply(input) && removeAppliedPenalties);
+            final Iterator<IPenalty<RI>> it = penalties.iterator();
+            while (it.hasNext()) {
+                if (it.next().apply(input) && removeAppliedPenalties) {
+                    it.remove();
+                }
+            }
             return penalties.isEmpty();
         }
     }
@@ -83,9 +88,15 @@ public class DefaultPenaltyList implements IPenaltyList {
     public <I> void applyAllApplicablePenalties(final I input, 
             final boolean removeAppliedPenalties) {
         final Class<?> inputClass = input.getClass();
-        penaltyMap.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(inputClass) &&
-                ((GenericNode<? super I>) entry.getValue()).apply(input, removeAppliedPenalties)
-                && removeAppliedPenalties);
+        final Iterator<Entry<Class<?>, GenericNode<?>>> it = penaltyMap.entrySet().iterator();
+        while (it.hasNext()) {
+            final Entry<Class<?>, GenericNode<?>> entry = it.next();
+            if (entry.getKey().isAssignableFrom(inputClass) && 
+                    ((GenericNode<? super I>) entry.getValue()).apply(input, removeAppliedPenalties)
+                    && removeAppliedPenalties) {
+                it.remove();
+            }
+        }
     }
 
 

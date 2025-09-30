@@ -26,6 +26,7 @@ import org.bukkit.event.player.PlayerToggleSneakEvent;
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.combined.CombinedListener;
 import fr.neatmonster.nocheatplus.compat.AlmostBoolean;
+import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
 import fr.neatmonster.nocheatplus.components.config.value.OverrideType;
 import fr.neatmonster.nocheatplus.components.data.IData;
 import fr.neatmonster.nocheatplus.components.data.IDataOnRemoveSubCheckData;
@@ -345,4 +346,105 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * check MovingData.hasTeleported().
      */
     public boolean isPlayerSetBackScheduled();
+
+    /**
+     * Get the client's protocol ID through ViaVersion or ProtocolSupport. <br>
+     * Requires CompatNoCheatPlus (subject to change)
+     * @see <a href="https://wiki.vg/Protocol_version_numbers">protocol indexing</a>
+     *
+     * @return -1, if it cannot be determined.
+     */
+    public int getClientVersionID();
+
+    /**
+     * Get the client's version (translated from the protocol ID) through ViaVersion or ProtocolSupport. <br>
+     * Requires CompatNoCheatPlus (subject to change)
+     *
+     * @return ClientVersion.UNKNOWN, if it cannot be determined.
+     */
+    public ClientVersion getClientVersion();
+
+    /**
+     * Set the client's protocol ID as given by ProtocolSupport or ViaVersion.
+     * Currently done externally, through CompatNoCheatPlus (subject to change)
+     * 
+     * @param ID
+     */
+    public void setClientVersionID(final int ID);
+    
+    /**
+     * Test if the player has pressed the shift key, as set by the {@link PlayerToggleSneakEvent}.<br>
+     * This is mostly intended to better disambiguate Crouching VS Sneaking. Using {@link Player#isSneaking()} can be misleading.<br> (See note in {@link CombinedListener#handlePoseChangeEvent(Entity, Pose)})
+     * 
+     * @return True, if the key is pressed.
+     */
+    public boolean isShiftKeyPressed();
+    
+    /**
+     * Set if the player has pressed the shift key.
+     *
+     * @param isKeyPressed
+     */
+    public void setIsShiftKeyPressed(final boolean isKeyPressed);
+    
+    /**
+     * Set whether the player is in its crouching pose.<br>
+     * 
+     * @param isInCrouchPose
+     */
+    public void setCrouching(final boolean isInCrouchPose);
+
+    /**
+     * Test if the player is in its crouching pose, as set by the EntityChangePoseEvent or PlayerToggleSneakEvent <br>
+     * Do not use IPlayerData#isShiftKeyPressed() if you wish to know if the player is moving slower than normal.
+     * Because sneaking is related to poses, not shift key presses.
+     * @return True, if sneaking.
+     */
+    public boolean isInCrouchingPose();
+
+    /**
+     * Set the sprinting state of the client.<br>
+     * There are cases where the information sent to the server can be inconsistent, so we need to estimate
+     * ourselves if the player could be sprinting.
+     * 
+     * @param sprinting
+     */
+    public void setSprintingState(final boolean sprinting);
+    
+    /**
+     * Get the sprinting state of the client, as set by PlayerData#setSprinting().<br>
+     * This ensures that sprinting is actually possible (i.e.: not with low food level)
+     * 
+     * @return True, if sprinting.
+     */
+    public boolean isSprinting();
+
+    /**
+     * Set the item currently in use by the player (eating, blocking etc...).<br>
+     * This is set only if the server doesn't provide the appropriate method (1.11 and below).
+     * 
+     * @param itemInUse
+     */
+    public void setItemInUse(final Material itemInUse);
+    
+    /**
+     * Get the item currently in use, as set by PlayerData#setItemInUse
+     * 
+     * @return The enum Material of the item in use.
+     */
+    public Material getItemInUse();
+    
+    /**
+     * Set the current supporting block data.
+     * 
+     * @param data Data to set.
+     */
+    public void setSupportingBlockData(SupportingBlockData data);
+    
+    /**
+     * Get the currently set supporting block data
+     * 
+     * @return the data.
+     */
+    public SupportingBlockData getSupportingBlockData();
 }

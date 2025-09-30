@@ -32,7 +32,6 @@ public class BukkitLogNodeDispatcher extends AbstractLogNodeDispatcher { // TODO
         if (runLogsPrimary()) {
             // TODO: Here or within runLogsPrimary, handle rescheduling.
         }
-
     };
 
     /**

@@ -142,8 +142,8 @@ public class GenericVersion {
      */
     public static String[] padVersions(String... versions) {
         int maxDivisions = 0;
-        for (String version : versions) {
-            maxDivisions = Math.max(maxDivisions, getVersionDivisions(version));
+        for (int i = 0; i < versions.length; i++) {
+            maxDivisions = Math.max(maxDivisions, getVersionDivisions(versions[i]));
         }
         String[] out = new String[versions.length];
         for (int i = 0; i < versions.length; i++) {

@@ -282,8 +282,8 @@ public class LocUtil {
      * @return true, if is bad coordinate
      */
     public static boolean isBadCoordinate(float ... floats) {
-        for (float aFloat : floats) {
-            if (Float.isNaN(aFloat) || Float.isInfinite(aFloat)) {
+        for (int i = 0; i < floats.length; i++) {
+            if (Float.isNaN(floats[i]) || Float.isInfinite(floats[i])) {
                 return true;
             }
         }
@@ -298,7 +298,8 @@ public class LocUtil {
      * @return true, if is bad coordinate
      */
     public static boolean isBadCoordinate(double ... doubles) {
-        for (final double x : doubles) {
+        for (int i = 0; i < doubles.length; i++) {
+            final double x = doubles[i];
             if (Double.isNaN(x) || Double.isInfinite(x) || Math.abs(x) > 3.2E7D) {
                 return true;
             }
@@ -405,7 +406,8 @@ public class LocUtil {
      * @return
      */
     public static World getFirstWorld(final Location... locs) {
-        for (final Location loc : locs) {
+        for (int i = 0; i < locs.length; i++) {
+            final Location loc = locs[i];
             if (loc != null) {
                 final World world = loc.getWorld();
                 if (world != null) {

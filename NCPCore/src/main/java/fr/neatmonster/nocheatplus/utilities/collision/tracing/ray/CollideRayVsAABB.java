@@ -144,7 +144,8 @@ public class CollideRayVsAABB implements ICollideRayVsAABB {
         closestDistanceSquared = CollisionUtil.getSquaredDistAABB(this.startX, this.startY, this.startZ, 
                 minX, minY, minZ, maxX, maxY, maxZ);
         // Find the closest point using set time values.
-        for (final double time : timeValues) {
+        for (int i = 0; i < timeValues.length; i++) {
+            final double time = timeValues[i];
             if (Double.isNaN(time) || Double.isInfinite(time)) {
                 // Note that Double.POSITIVE_INFINITY could mean that we are either colliding forever, or never.
                 continue;

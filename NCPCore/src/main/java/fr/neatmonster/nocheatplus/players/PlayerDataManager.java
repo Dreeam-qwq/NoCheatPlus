@@ -741,7 +741,8 @@ public class PlayerDataManager  implements IPlayerDataManager, ComponentWithName
         // Check online player tracking consistency.
         int missing = 0;
         int changed = 0;
-        for (final Player player : onlinePlayers) {
+        for (int i = 0; i < onlinePlayers.length; i++) {
+            final Player player = onlinePlayers[i];
             final UUID id = player.getUniqueId();
             //          if (player.isOnline()) {
             // TODO: Add a consistency check method !?

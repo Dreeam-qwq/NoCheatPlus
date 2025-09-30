@@ -163,7 +163,7 @@ public class Permissions {
 
     public static final RegisteredPermission  MOVING                       = add(CHECKS + ".moving");
     public static final RegisteredPermission  MOVING_CREATIVEFLY           = add(MOVING + ".creativefly");
-    public static final RegisteredPermission  MOVING_ELYTRAFLY             = add(MOVING + ".elytrafly"); // Allowing elytrafly permission, for Winds Anarchy
+    public static final RegisteredPermission  MOVING_ELYTRAFLY             = add(MOVING + ".elytrafly"); // Dreeam - Allowing elytrafly permission, for Winds Anarchy
     public static final RegisteredPermission  MOVING_MOREPACKETS           = add(MOVING + ".morepackets");
     public static final RegisteredPermission  MOVING_NOFALL                = add(MOVING + ".nofall");
     public static final RegisteredPermission  MOVING_PASSABLE              = add(MOVING + ".passable");
