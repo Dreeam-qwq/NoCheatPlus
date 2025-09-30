@@ -33,8 +33,9 @@ import fr.neatmonster.nocheatplus.config.DefaultConfig;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
 import fr.neatmonster.nocheatplus.worlds.IWorldData;
 import fr.neatmonster.nocheatplus.worlds.WorldDataManager;
+import fr.neatmonster.nocheatplus.MockServerBase;
 
-public class TestWorldDataManager {
+public class TestWorldDataManager extends MockServerBase {
 
     private WorldDataManager getWorldDataManager() {
         PluginTests.setUnitTestNoCheatPlusAPI(false);
@@ -92,13 +93,13 @@ public class TestWorldDataManager {
         set(rawWorldConfigs, null, ConfPaths.COMBINED + ConfPaths.SUB_ACTIVE, "yes");
         // All existing.
         setup(rawWorldConfigs, null, "Exist1", "Exist2");
-        set(rawWorldConfigs, ConfPaths.COMBINED_MUNCHHAUSEN_CHECK, "default");
+        set(rawWorldConfigs, ConfPaths.COMBINED_IMPROBABLE_CHECK, "default");
 
         // Exist1
         set(rawWorldConfigs, "Exist1", ConfPaths.COMBINED + ConfPaths.SUB_ACTIVE, "no");
 
         // Exist2
-        set(rawWorldConfigs, "Exist2", ConfPaths.COMBINED_MUNCHHAUSEN_CHECK, false);
+        set(rawWorldConfigs, "Exist2", ConfPaths.COMBINED_IMPROBABLE_CHECK, false);
 
         // (Might set some particularly interesting values here.)
 
@@ -114,24 +115,24 @@ public class TestWorldDataManager {
             }
         }
 
-        if (!worldMan.getWorldData("notExist1").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Inherited from default: COMBINED_MUNCHHAUSEN should be active (-> COMBINED is)");
+        if (!worldMan.getWorldData("notExist1").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Inherited from default: COMBINED_IMPROBABLE should be active (-> COMBINED is)");
         }
 
-        if (!worldMan.getDefaultWorldData().isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Default: COMBINED_MUNCHHAUSEN should be active (-> COMBINED is)");
+        if (!worldMan.getDefaultWorldData().isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Default: COMBINED_IMPROBABLE should be active (-> COMBINED is)");
         }
 
-        if (worldMan.getWorldData("Exist1").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Specific: COMBINED_MUNCHHAUSEN should not be active (-> COMBINED is not)");
+        if (worldMan.getWorldData("Exist1").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Specific: COMBINED_IMPROBABLE should not be active (-> COMBINED is not)");
         }
 
-        if (worldMan.getWorldData("Exist2").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Specific: COMBINED_MUNCHHAUSEN should not be active (directly set)");
+        if (worldMan.getWorldData("Exist2").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Specific: COMBINED_IMPROBABLE should not be active (directly set)");
         }
 
-        if (!worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Inherited from default: COMBINED_MUNCHHAUSEN should be active (-> COMBINED is)");
+        if (!worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Inherited from default: COMBINED_IMPROBABLE should be active (-> COMBINED is)");
         }
 
 
@@ -140,22 +141,22 @@ public class TestWorldDataManager {
         ////////////////
 
         // Override via config "reload":
-        set(rawWorldConfigs, "Exist2", ConfPaths.COMBINED_MUNCHHAUSEN_CHECK, true);
+        set(rawWorldConfigs, "Exist2", ConfPaths.COMBINED_IMPROBABLE_CHECK, true);
         worldMan.applyConfiguration(rawWorldConfigs);
-        if (!worldMan.getWorldData("Exist2").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Specific: COMBINED_MUNCHHAUSEN should be active (directly set)");
+        if (!worldMan.getWorldData("Exist2").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Specific: COMBINED_IMPROBABLE should be active (directly set)");
         }
 
         // Specific override (mild).
         worldMan.overrideCheckActivation(CheckType.COMBINED, AlmostBoolean.NO, 
                 OverrideType.SPECIFIC, false);
-        if (worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Overridden (inherited from default): COMBINED_MUNCHHAUSEN should not be active (-> COMBINED is not)");
+        if (worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Overridden (inherited from default): COMBINED_IMPROBABLE should not be active (-> COMBINED is not)");
         }
         worldMan.overrideCheckActivation(CheckType.COMBINED, AlmostBoolean.NO, 
                 OverrideType.SPECIFIC, true);
-        if (worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Overridden (inherited from default): COMBINED_MUNCHHAUSEN should not be active (overrideChildren from COMBINED should explicitly set this)");
+        if (worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Overridden (inherited from default): COMBINED_IMPROBABLE should not be active (overrideChildren from COMBINED should explicitly set this)");
         }
 
 
@@ -172,8 +173,8 @@ public class TestWorldDataManager {
         if (!worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED)) {
             fail("Inherited from default: COMBINED should be active after reload.");
         }
-        if (!worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Inherited from default: COMBINED_MUNCHHAUSEN should be active (-> COMBINED is)");
+        if (!worldMan.getWorldData("notExist2").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Inherited from default: COMBINED_IMPROBABLE should be active (-> COMBINED is)");
         }
 
 
@@ -181,10 +182,10 @@ public class TestWorldDataManager {
         // Override 2
         ////////////////
 
-        worldMan.getWorldData("NotExist3").overrideCheckActivation(CheckType.COMBINED_MUNCHHAUSEN, 
+        worldMan.getWorldData("NotExist3").overrideCheckActivation(CheckType.COMBINED_IMPROBABLE, 
                 AlmostBoolean.NO, OverrideType.SPECIFIC, false);
-        if (worldMan.getWorldData("notExist3").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Overridden (SPECIFIC): COMBINED_MUNCHHAUSEN should not be active (-directly set)");
+        if (worldMan.getWorldData("notExist3").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Overridden (SPECIFIC): COMBINED_IMPROBABLE should not be active (-directly set)");
         }
 
 
@@ -193,8 +194,8 @@ public class TestWorldDataManager {
         ///////////////////
         worldMan.applyConfiguration(rawWorldConfigs);
 
-        if (!worldMan.getWorldData("notExist3").isCheckActive(CheckType.COMBINED_MUNCHHAUSEN)) {
-            fail("Overridden (SPECIFIC): COMBINED_MUNCHHAUSEN should be active after reload (COMBINED is)");
+        if (!worldMan.getWorldData("notExist3").isCheckActive(CheckType.COMBINED_IMPROBABLE)) {
+            fail("Overridden (SPECIFIC): COMBINED_IMPROBABLE should be active after reload (COMBINED is)");
         }
 
         //////////////////////////////////////////////////////////////////////

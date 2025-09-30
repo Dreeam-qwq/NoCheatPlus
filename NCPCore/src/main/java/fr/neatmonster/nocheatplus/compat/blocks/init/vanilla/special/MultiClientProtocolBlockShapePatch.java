@@ -17,23 +17,20 @@ package fr.neatmonster.nocheatplus.compat.blocks.init.vanilla.special;
 import java.util.LinkedList;
 import java.util.List;
 
-import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
-import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 
-import fr.neatmonster.nocheatplus.compat.BridgeMaterial;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeMaterial;
 import fr.neatmonster.nocheatplus.compat.activation.ActivationUtil;
 import fr.neatmonster.nocheatplus.compat.blocks.AbstractBlockPropertiesPatch;
 import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
 import fr.neatmonster.nocheatplus.utilities.StringUtil;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
-import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
+import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 
 /**
  * Multi client protocol support since 1.7, roughly.
- * 
+ *
  * @author asofold
  *
  */
@@ -53,25 +50,11 @@ public class MultiClientProtocolBlockShapePatch extends AbstractBlockPropertiesP
 
     @Override
     public void setupBlockProperties(WorldConfigProvider<?> worldConfigProvider) {
-
         final List<String> done = new LinkedList<String>();
-
-        //This freaks out with 1.8 using viaversion
-        BlockFlags.addFlags(BridgeMaterial.LILY_PAD, BlockFlags.F_GROUND | BlockFlags.F_HEIGHT8_1 | BlockFlags.F_GROUND_HEIGHT);
         done.add("water_lily");
-
-        BlockFlags.addFlags(BridgeMaterial.FARMLAND, BlockFlags.F_MIN_HEIGHT16_15 | BlockFlags.F_HEIGHT100 | BlockFlags.F_GROUND_HEIGHT);
-        done.add("soil");
-
-        BlockFlags.addFlags(Material.VINE, BlockFlags.F_CLIMBUPABLE);
-        done.add("vine");
-
-        try {
-            BlockFlags.addFlags("HONEY_BLOCK", BlockFlags.F_MIN_HEIGHT16_15 | BlockFlags.F_HEIGHT100 | BlockFlags.F_GROUND_HEIGHT);
-            done.add("honey_block");
-        }
-        catch (Throwable t) {}
-
+        done.add("farmland");
+        if (BridgeMaterial.GRASS_PATH != null) done.add("grass_path");
+        done.add("honey_block");
 
         try {
             for (Material mat : MaterialUtil.SHULKER_BOXES) {

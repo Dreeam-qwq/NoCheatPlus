@@ -19,31 +19,57 @@ import org.bukkit.block.Block;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.VoxelShape;
 
+import fr.neatmonster.nocheatplus.utilities.collision.AxisAlignedBBUtils;
 import fr.neatmonster.nocheatplus.utilities.map.BlockCache;
 
+/**
+ * Fetches the block's collision VoxelShape and returns one or more bounding boxes
+ * as a concatenated double[] containing {minX,minY,minZ,maxX,maxY,maxZ} for each
+ * box. Coordinates are expressed relative to the block position.
+ *
+ * Difference from BukkitFetchableBound: this class may return multiple boxes
+ * (preserving complex/multi-part collision geometry); BukkitFetchableBound
+ * returns a single BoundingBox from Block#getBoundingBox().
+ */
 public class BukkitFetchableBounds implements BukkitShapeModel {
 
     @Override
     public double[] getShape(BlockCache blockCache, World world, int x, int y, int z) {
         final Block block = world.getBlockAt(x, y, z);
-        final VoxelShape blockshape = block.getCollisionShape();
+        final VoxelShape blockShape = block.getCollisionShape();
         double[] res = {};
-        for (BoundingBox box : blockshape.getBoundingBoxes()) {
-            res = add(res, toArray(box));
+        for (BoundingBox box : blockShape.getBoundingBoxes()) {
+            res = add(res, AxisAlignedBBUtils.toArray(box));
         }
         if (res.length == 0) return null;
         return res;
     }
-
+    
+    /**
+     * Concatenates two {@code double[]} arrays into a single array.
+     * <p>
+     * The contents of {@code array1} are placed first, followed by the contents
+     * of {@code array2}. The resulting array has a length equal to the sum of
+     * the lengths of the two input arrays.
+     * </p>
+     *
+     * <pre>
+     * Example:
+     * array1 = {1.0, 2.0}
+     * array2 = {3.0, 4.0}
+     * result = {1.0, 2.0, 3.0, 4.0}
+     * </pre>
+     *
+     * @param array1 the first array, may be empty but not {@code null}
+     * @param array2 the second array, may be empty but not {@code null}
+     * @return a new array containing all elements of {@code array1} followed by
+     *         all elements of {@code array2}
+     */
     private double[] add(final double[] array1, final double[] array2) {
         final double[] newArray = new double[array1.length + array2.length];
         System.arraycopy(array1, 0, newArray, 0, array1.length);
         System.arraycopy(array2, 0, newArray, array1.length, array2.length);
         return newArray;
-    }
-
-    private double[] toArray(BoundingBox box) {
-        return new double[] {box.getMinX(), box.getMinY(), box.getMinZ(), box.getMaxX(), box.getMaxY(), box.getMaxZ()};
     }
 
     @Override

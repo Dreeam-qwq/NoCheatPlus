@@ -1,4 +1,20 @@
+/*
+ * This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package fr.neatmonster.nocheatplus.compat.blocks.init.vanilla;
+
+import org.bukkit.Material;
 
 import fr.neatmonster.nocheatplus.compat.blocks.BlockPropertiesSetup;
 import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
@@ -8,52 +24,73 @@ import fr.neatmonster.nocheatplus.config.ConfigFile;
 import fr.neatmonster.nocheatplus.config.ConfigManager;
 import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
-import org.bukkit.Material;
+import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
+import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
 
 public class BlocksMC1_21 implements BlockPropertiesSetup {
+    public BlocksMC1_21() {
+        BlockInit.assertMaterialExists("CREAKING_HEART");
+    }
 
+    @SuppressWarnings("deprecation")
     @Override
     public void setupBlockProperties(WorldConfigProvider<?> worldConfigProvider) {
-
-        if (ServerVersion.compareMinecraftVersion("1.21.4") >= 0) {
-            BlockInit.setAs("RESIN_BLOCK", Material.ANDESITE);
-            BlockInit.setAs("RESIN_BRICKS", Material.ANDESITE);
-            BlockInit.setAs("RESIN_BRICK_SLAB", Material.ANDESITE_SLAB);
-            BlockInit.setAs("RESIN_BRICK_STAIRS", Material.ANDESITE_STAIRS);
-            BlockInit.setAs("RESIN_BRICK_WALL", Material.ANDESITE_WALL);
-            BlockInit.setAs("CHISELED_RESIN_BRICKS", Material.ANDESITE);
-
-            BlockInit.setAs("CREAKING_HEART", Material.ANDESITE);
-
-            BlockInit.setInstantPassable("RESIN_CLUMP");
-            BlockInit.setInstantPassable("CLOSED_EYEBLOSSOM");
-            BlockInit.setInstantPassable("OPEN_EYEBLOSSOM");
-            BlockInit.setInstantPassable("PALE_HANGING_MOSS");
-
-            BlockInit.setAs("PALE_OAK_LOG", Material.OAK_LOG);
-            BlockInit.setAs("PALE_OAK_WOOD", Material.OAK_WOOD);
-            BlockInit.setAs("PALE_OAK_PLANKS", Material.OAK_PLANKS);
-            BlockInit.setAs("PALE_OAK_SLAB", Material.OAK_SLAB);
-            BlockInit.setAs("PALE_OAK_STAIRS", Material.OAK_STAIRS);
-            BlockInit.setAs("PALE_OAK_FENCE", Material.OAK_FENCE);
-            BlockInit.setAs("PALE_OAK_FENCE_GATE", Material.OAK_FENCE_GATE);
-            BlockInit.setAs("PALE_OAK_DOOR", Material.OAK_DOOR);
-            BlockInit.setAs("PALE_OAK_TRAPDOOR", Material.OAK_TRAPDOOR);
-            BlockInit.setAs("PALE_OAK_HANGING_SIGN", Material.OAK_HANGING_SIGN);
-            BlockInit.setAs("PALE_MOSS_BLOCK", Material.MOSS_BLOCK);
-            BlockInit.setAs("PALE_OAK_LEAVES", Material.OAK_LEAVES);
-            BlockInit.setAs("PALE_OAK_SIGN", Material.OAK_SIGN);
-            BlockInit.setAs("PALE_OAK_WALL_SIGN", Material.OAK_WALL_SIGN);
-            BlockInit.setAs("PALE_OAK_WALL_HANGING_SIGN", Material.OAK_WALL_HANGING_SIGN);
-
-            BlockInit.setInstantPassable("PALE_OAK_PRESSURE_PLATE");
-            BlockInit.setInstantPassable("PALE_OAK_BUTTON");
+        BlockProperties.setBlockProps("OPEN_EYEBLOSSOM", BlockProperties.instantType);
+        BlockFlags.setBlockFlags("OPEN_EYEBLOSSOM", BlockFlags.F_IGN_PASSABLE);
+        
+        BlockProperties.setBlockProps("CLOSED_EYEBLOSSOM", BlockProperties.instantType);
+        BlockFlags.setBlockFlags("CLOSED_EYEBLOSSOM", BlockFlags.F_IGN_PASSABLE);
+        
+        BlockProperties.setBlockProps("PALE_HANGING_MOSS", BlockProperties.instantType);
+        BlockFlags.setBlockFlags("PALE_HANGING_MOSS", BlockFlags.F_IGN_PASSABLE);
+        
+        BlockProperties.setBlockProps("RESIN_CLUMP", BlockProperties.instantType);
+        BlockFlags.setBlockFlags("RESIN_CLUMP", BlockFlags.F_IGN_PASSABLE);
+        
+        BlockInit.setAs("PALE_MOSS_BLOCK", Material.MOSS_BLOCK); // Uh oh, BridgeMaterial.MOSS here?
+        
+        BlockInit.setAs("RESIN_BLOCK", Material.TNT); 
+        
+        BlockProperties.setBlockProps("CREAKING_HEART", new BlockProperties.BlockProps(BlockProperties.woodAxe, 10f));
+        BlockFlags.setBlockFlags("CREAKING_HEART", BlockFlags.FULLY_SOLID_BOUNDS);
+        
+        BlockInit.setAs("RESIN_BRICKS", Material.MUD_BRICKS); // From wiki, mud bricks and resin bricks have the same properties times.
+        
+        BlockInit.setAs("RESIN_BRICK_SLAB", Material.MUD_BRICK_SLAB);
+        
+        BlockInit.setAs("RESIN_BRICK_STAIRS", Material.MUD_BRICK_STAIRS);
+        
+        BlockInit.setAs("RESIN_BRICK_WALL", Material.MUD_BRICK_WALL);
+        
+        BlockInit.setAs("CHISELED_RESIN_BRICKS", Material.MUD_BRICKS);
+        
+        if (ServerVersion.isAtLeast("1.21.5")) {
+                    // Already set with MaterialUtil.INSTANT_PLANTS
+                    /* LOCK BREAKING (CACTUS_FLOWER / IGN_PASSABLE)
+                    
+                    // Already set with MaterialUtil.INSTANT_PLANTS
+                    * BLOCK BREAKING (LEAF_LITTER / IGN_PASSABLE)
+                    
+                    // Already set with MaterialUtil.INSTANT_PLANTS
+                    * BLOCK BREAKING (SHORT_DRY_GRASS / IGN_PASSABLE)
+                    
+                    // Already set with MaterialUtil.INSTANT_PLANTS
+                    * BLOCK BREAKING (TALL_DRY_GRASS / IGN_PASSABLE)*/
+            BlockInit.setAs("TEST_BLOCK", Material.BEDROCK);
+            BlockInit.setAs("TEST_INSTANCE_BLOCK", Material.BEDROCK);
+                    /*
+                    // Already set with MaterialUtil.INSTANT_PLANTS
+                    * BLOCK BREAKING (WILDFLOWERS / IGN_PASSABLE)  
+             */
         }
-
+        
+        if (ServerVersion.isAtLeast("1.21.6")) {
+            BlockProperties.setBlockProps("DRIED_GHAST", new BlockProperties.BlockProps(BlockProperties.noTool, 0.0f));
+            BlockFlags.setBlockFlags("DRIED_GHAST", BlockFlags.F_GROUND);
+        }
+               
         ConfigFile config = ConfigManager.getConfigFile();
-        if (config.getBoolean(ConfPaths.BLOCKBREAK_DEBUG, config.getBoolean(ConfPaths.CHECKS_DEBUG, false))) {
-            StaticLog.logInfo("Added block-info for Minecraft 1.21 blocks");
-        }
+        if (config.getBoolean(ConfPaths.BLOCKBREAK_DEBUG, config.getBoolean(ConfPaths.CHECKS_DEBUG, false)))
+        StaticLog.logInfo("Added block-info for Minecraft 1.21 blocks.");
     }
 }
-

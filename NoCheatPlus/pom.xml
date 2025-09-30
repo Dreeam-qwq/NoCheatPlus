@@ -1,0 +1,106 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>fr.neatmonster</groupId>
+    <artifactId>nocheatplus</artifactId>
+    <version>3.17.1-SNAPSHOT</version>
+
+    <name>NoCheatPlus</name>
+    <description>Detect and fight the exploitation of various flaws/bugs in Minecraft.</description>
+    <url>https://github.com/Updated-NoCheatPlus/NoCheatPlus</url>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.build.timestamp.format>yyyy_MM_dd-HH_mm</maven.build.timestamp.format>
+        <buildTimestamp>${maven.build.timestamp}</buildTimestamp>
+        <BUILD_NUMBER>?</BUILD_NUMBER>
+        <BUILD_SERIES>?</BUILD_SERIES>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>fr.neatmonster</groupId>
+            <artifactId>ncpplugin</artifactId>
+            <version>1.1-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+    <!-- Build Description Profiles -->
+    <profiles>
+        <profile>
+            <id>timestamp</id>
+            <activation>
+                <property>
+                    <name>!env.BUILD_NUMBER</name>
+                </property>
+            </activation>
+            <properties>
+                <buildDescription>${maven.build.timestamp}</buildDescription>
+            </properties>
+        </profile>
+        <profile>
+            <id>dynamic_build_number</id>
+            <activation>
+                <property>
+                    <name>env.BUILD_NUMBER</name>
+                </property>
+            </activation>
+            <properties>
+                <buildDescription>b${env.BUILD_NUMBER}</buildDescription>
+            </properties>
+        </profile>
+    </profiles>
+
+    <!-- Building -->
+    <build>
+        <defaultGoal>clean package</defaultGoal>
+        <directory>../target</directory> <!-- Build it one level up, because it is the one we care about -->
+        <finalName>NoCheatPlus</finalName>
+        <resources>
+            <resource>
+                <targetPath>.</targetPath>
+                <filtering>true</filtering>
+                <directory>..</directory>
+                <includes>
+                    <include>LICENSE.txt</include>
+                </includes>
+            </resource>
+            <!-- plugin.yml here to fill in the correct content. -->
+            <resource>
+                <targetPath>.</targetPath>
+                <filtering>true</filtering>
+                <directory>../NCPPlugin/src/main/resources</directory>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+        </resources>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

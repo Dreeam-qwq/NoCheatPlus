@@ -38,6 +38,8 @@ import com.comphenix.protocol.events.PacketAdapter;
 import fr.neatmonster.nocheatplus.NCPAPIProvider;
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.net.NetData;
+import fr.neatmonster.nocheatplus.compat.BridgeMisc;
+import fr.neatmonster.nocheatplus.compat.SchedulerHelper;
 import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.components.NoCheatPlusAPI;
 import fr.neatmonster.nocheatplus.components.registry.feature.IDisableListener;
@@ -63,7 +65,7 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
 
     // TODO: Static reference is problematic (needs a static and accessible Counters instance?). 
     public static final int idNullPlayer = NCPAPIProvider.getNoCheatPlusAPI().getGenericInstance(Counters.class).registerKey("packet.nullplayer");
-    /** Likely does not happen, TODO: Code review protocol plugin. */
+    /** Likely does not happen */
     public static final int idInconsistentIsAsync = NCPAPIProvider.getNoCheatPlusAPI().getGenericInstance(Counters.class).registerKey("packet.inconsistent.isasync");
 
     /**
@@ -92,7 +94,7 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
     public ProtocolLibComponent(Plugin plugin) {
         register(plugin);
         /*
-         * TODO: Register listeners iff any check is enabled - unregister from
+         * TODO: Register listeners if any check is enabled - unregister from
          * EventRegistry with unregister.
          */
     }
@@ -112,14 +114,15 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
         // Actual checks.
         if (ServerVersion.compareMinecraftVersion("1.6.4") <= 0) {
             // Don't use this listener.
-            NCPAPIProvider.getNoCheatPlusAPI().getLogManager().info(Streams.STATUS, "Disable EntityUseAdapter due to incompatibilities. Use fight.speed instead of net.attackfrequency.");
+            NCPAPIProvider.getNoCheatPlusAPI().getLogManager().info(Streams.STATUS, "Disable EntityUseAdapter due to incompatibilities. Click speed won't be monitored.");
         }
         else if (worldMan.isActiveAnywhere(CheckType.NET_ATTACKFREQUENCY)) {
             // (Also sets lastKeepAliveTime, if enabled.)
             register("fr.neatmonster.nocheatplus.checks.net.protocollib.UseEntityAdapter", plugin);
         }
-        if (worldMan.isActiveAnywhere(CheckType.NET_FLYINGFREQUENCY) || worldMan.isActiveAnywhere(CheckType.NET_MOVING)) {
+        if (worldMan.isActiveAnywhere(CheckType.MOVING) || worldMan.isActiveAnywhere(CheckType.NET)) {
             // (Also sets lastKeepAliveTime, if enabled.)
+            // If any check that uses flying packets is enabled, register all 
             register("fr.neatmonster.nocheatplus.checks.net.protocollib.MovingFlying", plugin);
             register("fr.neatmonster.nocheatplus.checks.net.protocollib.OutgoingPosition", plugin);
         }
@@ -130,19 +133,28 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
         if (worldMan.isActiveAnywhere(CheckType.NET_SOUNDDISTANCE)) {
             register("fr.neatmonster.nocheatplus.checks.net.protocollib.SoundDistance", plugin);
         }
-        if (worldMan.isActiveAnywhere(CheckType.NET_WRONGTURN)) {
-            register("fr.neatmonster.nocheatplus.checks.net.protocollib.WrongTurnAdapter", plugin);
-        }
         if (ServerVersion.compareMinecraftVersion("1.9") < 0) {
             if (worldMan.isActiveAnywhere(CheckType.NET_PACKETFREQUENCY)) {
                 register("fr.neatmonster.nocheatplus.checks.net.protocollib.CatchAllAdapter", plugin);
             }
         }
-        if (ServerVersion.compareMinecraftVersion("1.8") >= 0) {
-        	if (ConfigManager.isTrueForAnyConfig(ConfPaths.MOVING_SURVIVALFLY_EXTENDED_NOSLOW)) 
-        	    register("fr.neatmonster.nocheatplus.checks.net.protocollib.NoSlow", plugin);
-            register("fr.neatmonster.nocheatplus.checks.net.protocollib.Fight", plugin);
+        if (ServerVersion.isAtLeast("1.8")) {
+        	// if (!BridgeMisc.hasIsUsingItemMethod()) {
+        	    register("fr.neatmonster.nocheatplus.checks.net.protocollib.UseItemAdapter", plugin);
+        	// }
+            register("fr.neatmonster.nocheatplus.checks.net.protocollib.VelocityAdapter", plugin);
         }
+        else {
+            // Fuck 1.7.
+            NCPAPIProvider.getNoCheatPlusAPI().getLogManager().info(Streams.STATUS, "Disable UseItemAdapter and VelocityAdapter due to incompatibilities. Using-item status and explosion velocity won't be monitored.");
+        }
+        if (worldMan.isActiveAnywhere(CheckType.NET_TOGGLEFREQUENCY)) {
+            register("fr.neatmonster.nocheatplus.checks.net.protocollib.EntityActionAdapter", plugin);
+        }
+        if (BridgeMisc.hasPlayerInputEvent()) {
+            register("fr.neatmonster.nocheatplus.checks.net.protocollib.InputsAdapter", plugin);
+        }
+        
         if (!registeredPacketAdapters.isEmpty()) {
             List<String> names = new ArrayList<String>(registeredPacketAdapters.size());
             for (PacketAdapter adapter : registeredPacketAdapters) {
@@ -163,9 +175,11 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
             Class<?> clazz = Class.forName(name);
             register((Class<? extends PacketAdapter>) clazz, plugin);
             return;
-        } catch (ClassNotFoundException e) {
+        } 
+        catch (ClassNotFoundException e) {
             t = e;
-        } catch (ClassCastException e) {
+        } 
+        catch (ClassCastException e) {
             t = e;
         }
         StaticLog.logWarning("Could not register packet level hook: " + name);
@@ -178,7 +192,8 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
             PacketAdapter adapter = clazz.getDeclaredConstructor(Plugin.class).newInstance(plugin);
             ProtocolLibrary.getProtocolManager().addPacketListener(adapter);
             registeredPacketAdapters.add(adapter);
-        } catch (Throwable t) {
+        } 
+        catch (Throwable t) {
             StaticLog.logWarning("Could not register packet level hook: " + clazz.getSimpleName());
             StaticLog.logWarning(t);
             if (t.getCause() != null) {
@@ -206,9 +221,10 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
             try {
                 protocolManager.removePacketListener(adapter);
                 api.removeComponent(adapter); // Bit heavy, but consistent.
-            } catch (Throwable t) {
+            } 
+            catch (Throwable t) {
                 StaticLog.logWarning("Failed to unregister packet level hook: " + adapter.getClass().getName());
-            }// TODO Auto-generated method stub
+            }
 
         }
         registeredPacketAdapters.clear();
@@ -227,7 +243,8 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
             }
             api.setFeatureTags("packet-listeners", names);
             StaticLog.logInfo("Unregistered packet level hook:" + adapter.getClass().getName());
-        } catch (Throwable t) {
+        } 
+        catch (Throwable t) {
             StaticLog.logWarning("Failed to unregister packet level hook: " + adapter.getClass().getName());
         }
     }
@@ -237,6 +254,16 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
         if (!registeredPacketAdapters.isEmpty()) {
             DataManager.getGenericInstance(player, NetData.class).onJoin(player);
         }
+        SchedulerHelper.runSyncDelayedTask(Bukkit.getPluginManager().getPlugin("NoCheatPlus"), (arg) -> {
+            // Ensure client-version checking doesn't yield UNKNOWN if multiprotocol plugins are not present on the server
+            if (Bukkit.getPluginManager().getPlugin("ViaVersion") == null && Bukkit.getPluginManager().getPlugin("ProtocolSupport") == null) {
+                // Assume clients to match the server protocol version - We do not support protocol-hack plugins other than PS/Via
+                // - If not even ProtocolLib is installed, do return UNKNOWN (that's on the server's owner). Time to make NCP full-on depend on ProtocolLib?
+                // - If the server has protocol plugins active but doesn't have CompatNoCheatPlus, that's on them as well :)
+                //DataManager.getPlayerData(player).setClientVersionID(Via.getAPI().getPlayerVersion(player.getUniqueId()));
+                DataManager.getPlayerData(player).setClientVersionID(ProtocolLibrary.getProtocolManager().getProtocolVersion(player));
+            }
+        }, 5);
     }
 
     @Override
@@ -244,6 +271,7 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
         if (!registeredPacketAdapters.isEmpty()) {
             DataManager.getGenericInstance(player, NetData.class).onLeave(player);
         }
+        // (On leaving the server, client data is reset in PlayerData)
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -260,7 +288,6 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onPlayerTeleport(final PlayerTeleportEvent event) {
         if (!registeredPacketAdapters.isEmpty()) {
-            // TODO: Might move to MovingListener.
             // TODO: Might still add cancelled UNKNOWN events. TEST IT
             final Location to = event.getTo();
             if (to == null) {
@@ -269,12 +296,9 @@ public class ProtocolLibComponent implements IDisableListener, INotifyReload, Jo
             final Player player = event.getPlayer();
             final IPlayerData pData = DataManager.getPlayerData(player);
             final NetData data = pData.getGenericInstance(NetData.class);
-            if (pData.isCheckActive(CheckType.NET_FLYINGFREQUENCY, player)) {
-                // Register expected location for comparison with outgoing packets.
-                data.teleportQueue.onTeleportEvent(to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
-            }
+            // Register expected location for comparison with outgoing packets.
+            data.teleportQueue.onTeleportEvent(to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
             data.clearFlyingQueue();
         }
     }
-
 }

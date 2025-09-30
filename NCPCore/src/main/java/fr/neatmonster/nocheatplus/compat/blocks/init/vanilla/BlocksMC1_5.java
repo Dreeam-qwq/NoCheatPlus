@@ -16,10 +16,13 @@ package fr.neatmonster.nocheatplus.compat.blocks.init.vanilla;
 
 import org.bukkit.Material;
 
-import fr.neatmonster.nocheatplus.compat.BridgeMaterial;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeMaterial;
 import fr.neatmonster.nocheatplus.compat.blocks.BlockPropertiesSetup;
 import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
-import fr.neatmonster.nocheatplus.config.*;
+import fr.neatmonster.nocheatplus.config.ConfPaths;
+import fr.neatmonster.nocheatplus.config.ConfigFile;
+import fr.neatmonster.nocheatplus.config.ConfigManager;
+import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 
@@ -66,7 +69,6 @@ public class BlocksMC1_5 implements BlockPropertiesSetup {
         BlockInit.setAs(BridgeMaterial.NETHER_QUARTZ_ORE, Material.COAL_ORE);
 
         BlockInit.setAs("HOPPER", Material.COAL_ORE);
-        BlockFlags.addFlags("HOPPER", BlockFlags.F_GROUND_HEIGHT | BlockFlags.F_MIN_HEIGHT8_5);
 
         BlockInit.setAs("QUARTZ_BLOCK", Material.SANDSTONE);
 

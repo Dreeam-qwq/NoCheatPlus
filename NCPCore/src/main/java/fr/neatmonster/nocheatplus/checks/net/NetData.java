@@ -18,12 +18,26 @@ import java.util.LinkedList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
+import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.access.ACheckData;
+import fr.neatmonster.nocheatplus.checks.moving.MovingConfig;
+import fr.neatmonster.nocheatplus.checks.moving.MovingData;
 import fr.neatmonster.nocheatplus.checks.net.model.DataPacketFlying;
+import fr.neatmonster.nocheatplus.checks.net.model.DataPacketInput;
 import fr.neatmonster.nocheatplus.checks.net.model.TeleportQueue;
+import fr.neatmonster.nocheatplus.compat.BridgeMisc;
+import fr.neatmonster.nocheatplus.compat.SchedulerHelper;
+import fr.neatmonster.nocheatplus.components.debug.IDebugPlayer;
+import fr.neatmonster.nocheatplus.logging.StaticLog;
+import fr.neatmonster.nocheatplus.players.DataManager;
+import fr.neatmonster.nocheatplus.players.IPlayerData;
+import fr.neatmonster.nocheatplus.utilities.CheckUtils;
 import fr.neatmonster.nocheatplus.utilities.ds.count.ActionFrequency;
+import fr.neatmonster.nocheatplus.utilities.location.LocUtil;
 
 /**
  * Data for net checks. Some data structures may not be thread-safe, intended
@@ -37,24 +51,17 @@ public class NetData extends ACheckData {
 
     // Reentrant lock.
     private final Lock lock = new ReentrantLock();
+    private final Lock locki = new ReentrantLock();
 
     // AttackFrequency
-    public ActionFrequency attackFrequencySeconds = new ActionFrequency(16, 500);
+    public ActionFrequency attackFrequencySeconds = new ActionFrequency(16, 500); //16 buckets each with 500ms duration = 8 seconds
 
     // FlyingFrequency
     /** All flying packets, use System.currentTimeMillis() for time. */
     public final ActionFrequency flyingFrequencyAll;
-    public boolean flyingFrequencyOnGround = false;
-    public long flyingFrequencyTimeOnGround = 0L;
-    public long flyingFrequencyTimeNotOnGround = 0L;
 
     // Moving
     public double movingVL = 0;
-    /**
-     * Monitors redundant packets, when more than 20 packets per second are
-     * sent. Use System.currentTimeMillis() for time.
-     */
-    public final ActionFrequency flyingFrequencyRedundantFreq;
 
     // KeepAliveFrequency
     /**
@@ -63,8 +70,12 @@ public class NetData extends ACheckData {
      */
     public ActionFrequency keepAliveFreq = new ActionFrequency(20, 1000);
 	
-	// Wrong Turn
+    // Wrong Turn
     public double wrongTurnVL = 0;
+    
+    // ToggleFrequency
+    public double toggleFrequencyVL = 0;
+    public ActionFrequency playerActionFreq;
     
     // Shared.
     /**
@@ -87,11 +98,9 @@ public class NetData extends ACheckData {
     // TODO: Might extend to synchronize with moving events.
     private final LinkedList<DataPacketFlying> flyingQueue = new LinkedList<DataPacketFlying>();
     /** Maximum amount of packets to store. */
-    private final int flyingQueueMaxSize = 15;
-    /**
-     * The maximum of so far already returned sequence values, altered under
-     * lock.
-     */
+    private final LinkedList<DataPacketInput> inputQueue = new LinkedList<DataPacketInput>();
+    private final int flyingQueueMaxSize = 20; // TODO: Might want to increase, what if the server-side lag then it can recover and receiving lots of packet? Like try pasting large structure using WorldEdit. 
+    /** The maximum of so far already returned sequence values, altered under lock. */
     private long maxSequence = 0;
 
     /** Overall packet frequency. */
@@ -99,13 +108,11 @@ public class NetData extends ACheckData {
 
     public NetData(final NetConfig config) {
         flyingFrequencyAll = new ActionFrequency(config.flyingFrequencySeconds, 1000L);
-        flyingFrequencyRedundantFreq = new ActionFrequency(config.flyingFrequencyRedundantSeconds, 1000L);
         if (config.packetFrequencySeconds <= 2) {
             packetFrequency = new ActionFrequency(config.packetFrequencySeconds * 3, 333);
         }
-        else {
-            packetFrequency = new ActionFrequency(config.packetFrequencySeconds * 2, 500);
-        }
+        else packetFrequency = new ActionFrequency(config.packetFrequencySeconds * 2, 500);
+        playerActionFreq = new ActionFrequency(Math.max(1, config.toggleActionSeconds), 1000L);
     }
 
     public void onJoin(final Player player) {
@@ -116,6 +123,46 @@ public class NetData extends ACheckData {
     public void onLeave(Player player) {
         teleportQueue.clear();
         clearFlyingQueue();
+    }
+    
+    /**
+     * Safely request a set back from MovingData.
+     * 
+     * @param player
+     * @param idp
+     * @param plugin
+     * @param checkType
+     */
+    public void requestSetBack(final Player player, final IDebugPlayer idp, final Plugin plugin, final CheckType checkType) {
+        final IPlayerData pData = DataManager.getPlayerData(player);
+        /** Last known location that has been registered by Bukkit. */
+        final Location knownLocation = player.getLocation();
+        final MovingData mData = pData.getGenericInstance(MovingData.class);
+        Object task = null;
+        task = SchedulerHelper.runSyncTaskForEntity(player, plugin, (arg) -> {
+            /** Get the first set-back location that might be available */
+            final Location newTo = mData.hasSetBack() ? mData.getSetBack(knownLocation) :
+                                   mData.hasMorePacketsSetBack() ? mData.getMorePacketsSetBack() :
+                                   // Shouldn't happen. If it does, the location is likely to be null
+                                   knownLocation;
+            // Unsafe position. Location hasn't been updated yet.  
+            if (newTo == null) {
+                StaticLog.logSevere("Could not retrieve a safe (set back) location for " + player.getName() + " on packet-level, kicking them due to crash potential.");
+                CheckUtils.kickIllegalMove(player, pData.getGenericInstance(MovingConfig.class));
+            } 
+            else {
+                // Mask player teleport as a set back.
+                mData.prepareSetBack(newTo);
+                SchedulerHelper.teleportEntity(player, LocUtil.clone(newTo), BridgeMisc.TELEPORT_CAUSE_CORRECTION_OF_POSITION);
+                if (pData.isDebugActive(checkType)) {
+                    idp.debug(player, "Packet set back tasked for player: " + player.getName() + " at :" + LocUtil.simpleFormat(newTo));
+                }
+            }
+        }, null);
+        if (!SchedulerHelper.isTaskScheduled(task)) {
+            StaticLog.logWarning("Failed to schedule packet set back task for player: " + player.getName());
+        }
+        mData.resetTeleported(); // Cleanup, just in case.
     }
 
     /**
@@ -135,16 +182,42 @@ public class NetData extends ACheckData {
             res = true;
         }
         lock.unlock();
+        locki.lock();
+        inputQueue.addFirst(null);
+        if (inputQueue.size() > flyingQueueMaxSize + 1) {
+            inputQueue.removeLast();
+        }
+        locki.unlock();
         return res;
     }
 
     /**
-     * Clear the flying packet queue (under lock).
+     * Update packet to first entry the queue (under lock).
+     * 
+     * @param packetData
+     */
+    public void addInputQueue(final DataPacketInput packetData) {
+        locki.lock();
+        if (inputQueue.isEmpty()) {
+            inputQueue.add(packetData);
+            locki.unlock();
+            return;
+        }
+        inputQueue.set(0, packetData);
+        locki.unlock();
+    }
+
+    /**
+     * Clear the flying/input packet queue (under lock).
      */
     public void clearFlyingQueue() {
         lock.lock();
         flyingQueue.clear();
         lock.unlock();
+
+        locki.lock();
+        inputQueue.clear();
+        locki.unlock();
     }
 
     /**
@@ -161,6 +234,18 @@ public class NetData extends ACheckData {
          */
         final DataPacketFlying[] out = flyingQueue.toArray(new DataPacketFlying[flyingQueue.size()]);
         lock.unlock();
+        return out;
+    }
+
+    /**
+     * Copy the entire input queue (under lock).
+     * 
+     * @return
+     */
+    public DataPacketInput[] copyInputQueue() {
+        locki.lock();
+        final DataPacketInput[] out = inputQueue.toArray(new DataPacketInput[inputQueue.size()]);
+        locki.unlock();
         return out;
     }
 
@@ -195,10 +280,7 @@ public class NetData extends ACheckData {
         final long now = System.currentTimeMillis();
         teleportQueue.clear(); // Can't handle timeouts. TODO: Might still keep.
         lastKeepAliveTime = Math.min(lastKeepAliveTime, now);
-        flyingFrequencyTimeNotOnGround = Math.min(flyingFrequencyTimeNotOnGround, now);
-        flyingFrequencyTimeOnGround = Math.min(flyingFrequencyTimeOnGround, now);
         // (Keep flyingQueue.)
         // (ActionFrequency can handle this.)
     }
-
 }

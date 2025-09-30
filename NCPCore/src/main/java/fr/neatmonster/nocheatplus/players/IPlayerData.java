@@ -17,9 +17,14 @@ package fr.neatmonster.nocheatplus.players;
 import java.util.Collection;
 import java.util.UUID;
 
+import org.bukkit.Material;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
 
 import fr.neatmonster.nocheatplus.checks.CheckType;
+import fr.neatmonster.nocheatplus.checks.combined.CombinedListener;
 import fr.neatmonster.nocheatplus.compat.AlmostBoolean;
 import fr.neatmonster.nocheatplus.components.config.value.OverrideType;
 import fr.neatmonster.nocheatplus.components.data.IData;
@@ -28,6 +33,8 @@ import fr.neatmonster.nocheatplus.components.data.checktype.IBaseDataAccess;
 import fr.neatmonster.nocheatplus.components.registry.IGetGenericInstance;
 import fr.neatmonster.nocheatplus.hooks.ExemptionContext;
 import fr.neatmonster.nocheatplus.permissions.RegisteredPermission;
+import fr.neatmonster.nocheatplus.utilities.collision.supportingblock.SupportingBlockData;
+import fr.neatmonster.nocheatplus.utilities.entity.InventoryUtil;
 import fr.neatmonster.nocheatplus.worlds.IWorldData;
 import fr.neatmonster.nocheatplus.worlds.WorldIdentifier;
 
@@ -104,7 +111,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * ExemptionContext.LEGACY_NON_NESTED will not be touched.
      * <hr>
      * Primary thread and asynchronous access are separated and yield different
-     * results, it's imperative to always unexempt properly for asyncrhonous
+     * results, it's imperative to always unexempt properly for asynchronous
      * thread contexts, as isExempted reflects a mixture of both.
      * 
      * @param checkType
@@ -118,7 +125,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * unexempt(CheckType, ExemptionContext).
      * <hr>
      * Primary thread and asynchronous access are separated and yield different
-     * results, it's imperative to always unexempt properly for asyncrhonous
+     * results, it's imperative to always unexempt properly for asynchronous
      * thread contexts, as isExempted reflects a mixture of both.
      * 
      * @param checkType
@@ -136,7 +143,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * unexemptAll as is done with the legacy signature unexempt(CheckType).
      * <hr>
      * Primary thread and asynchronous access are separated and yield different
-     * results, it's imperative to always unexempt properly for asyncrhonous
+     * results, it's imperative to always unexempt properly for asynchronous
      * thread contexts, as isExempted reflects a mixture of both.
      * 
      * @param checkType
@@ -149,7 +156,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * and descendants recursively.
      * <hr>
      * Primary thread and asynchronous access are separated and yield different
-     * results, it's imperative to always unexempt properly for asyncrhonous
+     * results, it's imperative to always unexempt properly for asynchronous
      * thread contexts, as isExempted reflects a mixture of both.
      * 
      * @param checkType
@@ -225,8 +232,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * @param worldData
      * @return
      */
-    public boolean isCheckActive(final CheckType checkType, final Player player,
-            final IWorldData worldData);
+    public boolean isCheckActive(final CheckType checkType, final Player player, final IWorldData worldData);
 
     /**
      * Bypass check including exemption and permission.
@@ -257,8 +263,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * @param overrideType
      * @param overrideChildren
      */
-    public void overrideDebug(final CheckType checkType, final AlmostBoolean active, 
-            final OverrideType overrideType, final boolean overrideChildren);
+    public void overrideDebug(final CheckType checkType, final AlmostBoolean active, final OverrideType overrideType, final boolean overrideChildren);
 
     @Override
     public <T> T getGenericInstance(Class<T> registeredFor);
@@ -284,9 +289,7 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
      * 
      * @param subCheckRemoval
      */
-    public void removeSubCheckData(
-            Collection<Class<? extends IDataOnRemoveSubCheckData>> subCheckRemoval,
-            Collection<CheckType> checkTypes);
+    public void removeSubCheckData(Collection<Class<? extends IDataOnRemoveSubCheckData>> subCheckRemoval, Collection<CheckType> checkTypes);
 
     /**
      * Check if notifications are turned off, this does not bypass permission
@@ -306,14 +309,14 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
     public void setNotifyOff(final boolean notifyOff);
     
     /**
-     * Check if player join via geysermc
+     * Check if the player joins via GeyserMC
      * 
-     * @return
+     * @return True, if so.
      */
     public boolean isBedrockPlayer();
 
     /**
-     * Set the state player connect through geysermc
+     * Mark this player as a Bedrock player.
      * 
      * @param bedrockPlayer
      */
@@ -325,6 +328,13 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
     public void requestUpdateInventory();
 
     /**
+     * Hacky way to circumvent item usage de-synchronization issues between the server and the client.
+     * This also calls requestUpdateInventory().
+     * See {@link InventoryUtil#itemResyncTask(Player, IPlayerData)} for more details.
+     */
+    public void requestItemUseResync();
+
+    /**
      * Let the player be set back to the location stored in moving data (run in
      * TickTask). Only applies if it's set there.
      */
@@ -333,8 +343,6 @@ public interface IPlayerData extends IData, IBaseDataAccess, IGetGenericInstance
     /**
      * Test if it's set to process a player set back on tick. This does not
      * check MovingData.hasTeleported().
-     * 
-     * @return
      */
     public boolean isPlayerSetBackScheduled();
 }

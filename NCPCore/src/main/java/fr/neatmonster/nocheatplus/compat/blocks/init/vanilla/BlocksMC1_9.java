@@ -16,10 +16,13 @@ package fr.neatmonster.nocheatplus.compat.blocks.init.vanilla;
 
 import org.bukkit.Material;
 
-import fr.neatmonster.nocheatplus.compat.BridgeMaterial;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeMaterial;
 import fr.neatmonster.nocheatplus.compat.blocks.BlockPropertiesSetup;
 import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
-import fr.neatmonster.nocheatplus.config.*;
+import fr.neatmonster.nocheatplus.config.ConfPaths;
+import fr.neatmonster.nocheatplus.config.ConfigFile;
+import fr.neatmonster.nocheatplus.config.ConfigManager;
+import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
@@ -54,7 +57,8 @@ public class BlocksMC1_9 implements BlockPropertiesSetup {
         BlockInit.setAs("PURPUR_PILLAR", BridgeMaterial.STONE_BRICKS); // Rough.
 
         BlockInit.setAs("PURPUR_STAIRS", BridgeMaterial.STONE_BRICK_STAIRS); // Rough.
-
+        
+        // Uhm, why the double if?
         if (BridgeMaterial.has("PURPUR_DOUBLE_SLAB")) {
             if (BridgeMaterial.has("PURPUR_DOUBLE_SLAB")) {
                 BlockInit.setAs("PURPUR_DOUBLE_SLAB", "DOUBLE_STEP");
@@ -69,7 +73,7 @@ public class BlocksMC1_9 implements BlockPropertiesSetup {
         BlockInit.setInstantPassable(BridgeMaterial.BEETROOTS);
 
         BlockProperties.setBlockProps(BridgeMaterial.GRASS_PATH, new BlockProps(BlockProperties.woodSpade, 0.65f));
-        BlockFlags.addFlags(BridgeMaterial.GRASS_PATH, BlockFlags.F_MIN_HEIGHT16_15 | BlockFlags.F_XZ100 | BlockFlags.SOLID_GROUND | BlockFlags.F_GROUND_HEIGHT);
+        BlockFlags.addFlags(BridgeMaterial.GRASS_PATH, BlockFlags.F_XZ100 | BlockFlags.SOLID_GROUND);
 
         // -> Leave flags as is (like air).
         BlockProperties.setBlockProps("END_GATEWAY", BlockProperties.indestructibleType);

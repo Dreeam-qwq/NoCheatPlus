@@ -16,33 +16,18 @@ package fr.neatmonster.nocheatplus.utilities.map;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.InputMismatchException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
-import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.World;
-import org.bukkit.block.Block;
-import org.bukkit.configuration.ConfigurationSection;
 
-import fr.neatmonster.nocheatplus.compat.blocks.BlockPropertiesSetup;
-import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
-import fr.neatmonster.nocheatplus.config.RawConfigFile;
-import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
-import fr.neatmonster.nocheatplus.logging.LogManager;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
-import fr.neatmonster.nocheatplus.logging.Streams;
-import fr.neatmonster.nocheatplus.utilities.StringUtil;
-import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
+import fr.neatmonster.nocheatplus.utilities.map.BlockCache.IBlockCacheNode;
 
 /**
  * Flags and utilities for block-flags.
@@ -88,7 +73,9 @@ public class BlockFlags {
     /** Minecraft isSolid result. Used for setting ground flag - Subject to change / rename. */
     public static final long F_SOLID                        = f_flag();
 
-    /** Compatibility flag: regard this block as passable always. */
+    /** Compatibility flag: regard this block as passable always.<br>
+     * NOTE: Extremely cautious when assign with F_GROUND. They can conflict each others causing random bugs
+     * */
     public static final long F_IGN_PASSABLE                 = f_flag();
 
     /** Like water. */
@@ -120,6 +107,7 @@ public class BlockFlags {
 
     /** 
      * The block can change shape. This is most likely not 100% accurate...<br>
+     * Tell the NCP that you can jump in the block!<br>
      * More likely to indicate block change shape when stacking up
      */
     public static final long F_VARIABLE                     = f_flag();
@@ -134,7 +122,9 @@ public class BlockFlags {
      * for minimum height.<br>
      * In addition this flag directly triggers a passable workaround for
      * otherwise colliding blocks
-     * ({@link BlockProperties#isPassableWorkaround(BlockCache, int, int, int, double, double, double, IBlockCacheNode, double, double, double, double)}).
+     * ({@link BlockProperties#isPassableWorkaround(BlockCache, int, int, int, double, double, double, IBlockCacheNode, double, double, double, double)}).<br>
+     * On early days, this designed for block compatibility from versions to versions. Some where here and there, it conflicted each others, create bugs that hard to find out.<br>
+     * Mordern design shouldn't use this flag, instead try to define between versions. Use this as LAST RESORT.
      */
     public static final long F_GROUND_HEIGHT                = f_flag();
 
@@ -144,13 +134,6 @@ public class BlockFlags {
      * However the hit-box for collision checks  will be set to 0.5 height or 1.0 height only.
      */
     public static final long F_HEIGHT_8SIM_DEC              = f_flag();
-
-    /**
-     * The height is assumed to increase with data value up to 0x7, repeating up to 0x15.<br>
-     * However the hit-box for collision checks  will be set to 0.5 height or 1.0 height only,<br>
-     * as with the 1.4.x snow levels.
-     */
-    public static final long F_HEIGHT_8SIM_INC              = f_flag();
 
     /**
      * The height increases with data value (8 heights).<br>
@@ -173,7 +156,7 @@ public class BlockFlags {
     /** Thin fences: iron bars and glass panes. */
     public static final long F_THIN_FENCE                   = f_flag();
 
-    /** Meta-flag to indicate that the (max.-) edges should mean a collision, can be passed to collidesBlock. */
+    /** Meta-flag to indicate that the maxXZ edges of an AABB should mean a collision, can be passed to collidesBlock. */
     public static final long F_COLLIDE_EDGES                = f_flag();
 
     /** Thick fences: actual fences. */
@@ -201,89 +184,84 @@ public class BlockFlags {
      */
     public static final long F_ATTACHED_LOW2_SNEW           = f_flag();
 
-    /**
-     * The hacky way to force sfNoLowJump when the block at from has this flag.
-     */
-    public static final long F_ALLOW_LOWJUMP                = f_flag();
-
-    /** One eighth block height (0.125). */
-    public static final long F_HEIGHT8_1                    = f_flag();
-
-    /**
-     * Fall distance is divided by 2, if a move goes through this medium (currently only supports liquid).
-     */
-    public static final long F_FALLDIST_HALF                = f_flag();
-
-    /**
-     * Fall distance is set to zero, if a move goes through this medium (currently only supports liquid).
-     */
-    public static final long F_FALLDIST_ZERO                = f_flag();
-    
-    /**
-     * Minimum height 15/16 (0.9375 = 1 - 0.0625). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_15              = f_flag();
-
-    /**
-     * Minimum height 14/16 (8750). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_14              = f_flag();
-    
-    /**
-     * Minimum height 13/16 (8125). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_13              = f_flag();
-
-    /**
-     * Minimum height 11/16 (0.6875). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_11              = f_flag();
-
-    /**
-     * Minimum height 5/8 (0.625). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT8_5                = f_flag();
-
-    /**
-     * Minimum height 9/16 (0.5625). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_9               = f_flag();
-
-    /**
-     * Minimum height 7/16 (0.4375). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_7               = f_flag();
-    
-    /**
-     * Minimum height 5/16 (0.3125). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_5               = f_flag();
-
-    /**
-     * Minimum height 1/4 (0.25). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT4_1                = f_flag();
-
-    /**
-     * Minimum height 1/8 (0.125). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT8_1                = f_flag();
-    
-    /**
-     * Minimum height 1/16 (0.0625). <br>
-     * Only applies with F_GROUND_HEIGHT set.
-     */
-    public static final long F_MIN_HEIGHT16_1               = f_flag();
+//    /** One eighth block height (0.125). */
+//    public static final long F_HEIGHT8_1                    = f_flag();
+//    //Should be handle with NoFall, no need to put a flag to indicate so, what if blocks not half or zero fall damgage?
+//    /**
+//     * Fall distance is divided by 2, if a move goes through this medium (currently only supports liquid).
+//     */
+//    public static final long F_FALLDIST_HALF                = f_flag();
+//
+//    /**
+//     * Fall distance is set to zero, if a move goes through this medium (currently only supports liquid).
+//     */
+//    public static final long F_FALLDIST_ZERO                = f_flag();
+//    
+//    /**
+//     * Minimum height 15/16 (0.9375 = 1 - 0.0625). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_15              = f_flag();
+//
+//    /**
+//     * Minimum height 14/16 (8750). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_14              = f_flag();
+//    
+//    /**
+//     * Minimum height 13/16 (8125). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_13              = f_flag();
+//
+//    /**
+//     * Minimum height 11/16 (0.6875). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_11              = f_flag();
+//
+//    /**
+//     * Minimum height 5/8 (0.625). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT8_5                = f_flag();
+//
+//    /**
+//     * Minimum height 9/16 (0.5625). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_9               = f_flag();
+//
+//    /**
+//     * Minimum height 7/16 (0.4375). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_7               = f_flag();
+//    
+//    /**
+//     * Minimum height 5/16 (0.3125). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_5               = f_flag();
+//
+//    /**
+//     * Minimum height 1/4 (0.25). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT4_1                = f_flag();
+//
+//    /**
+//     * Minimum height 1/8 (0.125). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT8_1                = f_flag();
+//    
+//    /**
+//     * Minimum height 1/16 (0.0625). <br>
+//     * Only applies with F_GROUND_HEIGHT set.
+//     */
+//    public static final long F_MIN_HEIGHT16_1               = f_flag();
 
     /** Indicator flag. */
     public static final long F_CARPET                       = f_flag();
@@ -310,20 +288,14 @@ public class BlockFlags {
      */
     public static final long F_VARIABLE_REDSTONE            = f_flag();
 
-    /** Height 15/16 (0.9375 = 1 - 0.0625). */
-    public static final long F_HEIGHT16_15                  = f_flag();
-
     /** Like bubble column. */
-    public static final long F_BUBBLECOLUMN                 = f_flag();
-
-    /* Indicator flag. */
-    public static final long F_ANVIL                        = f_flag();
+    public static final long F_BUBBLE_COLUMN                = f_flag();
     
     /** Flag used to workaround bugged block bounds in older servers for thin fences. */
     public static final long F_FAKEBOUNDS                   = f_flag();
     
     /** Like powder snow: climbable and ground with leather shoes on. */
-    public static final long F_POWDERSNOW                   = f_flag();
+    public static final long F_POWDER_SNOW = f_flag();
 
     /** Explicitly set full bounds. */
     public static final long FULL_BOUNDS                    = F_XZ100 | F_HEIGHT100;
@@ -352,8 +324,7 @@ public class BlockFlags {
                         nameFlagMap.put(name, value);
                         nameFlagMap.put(name.substring(2), value);
                     } 
-                    catch (IllegalArgumentException e) {} 
-                    catch (IllegalAccessException e) {}
+                    catch (IllegalArgumentException | IllegalAccessException e) {}
                 }
             }
         }
@@ -482,20 +453,20 @@ public class BlockFlags {
     /**
      * Sets the block flags.
      *
-     * @param blockType
-     *            the block type
+     * @param material
+     *            the material
      * @param flags
      *            the flags
      */
-    public static final void setBlockFlags(final Material blockType, final long flags) {
+    public static final void setBlockFlags(final Material material, final long flags) {
         try {
-            if (!blockType.isBlock()) {
+            if (!material.isBlock()) {
                 // Let's not fail hard here.
-                StaticLog.logWarning("Attempt to set flags for a non-block: " + blockType);
+                StaticLog.logWarning("Attempt to set flags for a non-block: " + material);
             }
         } 
         catch (Exception e) {}
-        blockFlags.put(blockType, flags);
+        blockFlags.put(material, flags);
     }
 
     /**

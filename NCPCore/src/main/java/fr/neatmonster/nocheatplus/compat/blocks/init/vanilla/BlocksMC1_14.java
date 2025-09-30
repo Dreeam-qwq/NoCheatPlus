@@ -2,10 +2,13 @@ package fr.neatmonster.nocheatplus.compat.blocks.init.vanilla;
 
 import org.bukkit.Material;
 
-import fr.neatmonster.nocheatplus.compat.BridgeMaterial;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeMaterial;
 import fr.neatmonster.nocheatplus.compat.blocks.BlockPropertiesSetup;
 import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
-import fr.neatmonster.nocheatplus.config.*;
+import fr.neatmonster.nocheatplus.config.ConfPaths;
+import fr.neatmonster.nocheatplus.config.ConfigFile;
+import fr.neatmonster.nocheatplus.config.ConfigManager;
+import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
@@ -23,7 +26,6 @@ public class BlocksMC1_14 implements BlockPropertiesSetup{
     public void setupBlockProperties(WorldConfigProvider<?> worldConfigProvider) {
         // TODO: Clean up the mess
 
-        BlockFlags.addFlags("VINE", BlockFlags.F_CLIMBUPABLE);
         final BlockProperties.BlockProps instant = BlockProperties.instantType;
         BlockInit.setPropsAs("END_STONE_BRICK_WALL", BridgeMaterial.END_STONE_BRICKS);
         BlockInit.setPropsAs("END_STONE_BRICK_STAIRS", BridgeMaterial.END_STONE_BRICKS);
@@ -113,8 +115,7 @@ public class BlocksMC1_14 implements BlockPropertiesSetup{
         BlockInit.setPropsAs("BARREL", "LECTERN");
 
         BlockProperties.setBlockProps("SCAFFOLDING", instant);
-        BlockFlags.addFlags("SCAFFOLDING", 
-        BlockFlags.F_IGN_PASSABLE |  BlockFlags.F_CLIMBABLE | BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT | BlockFlags.F_XZ100);
+        BlockFlags.addFlags("SCAFFOLDING", BlockFlags.F_CLIMBABLE | BlockFlags.F_GROUND | BlockFlags.F_VARIABLE);
 
         BlockProperties.setBlockProps("STONECUTTER", new BlockProperties.BlockProps(BlockProperties.woodPickaxe, 3.5f, true));
         BlockFlags.addFlags("STONECUTTER", BlockFlags.SOLID_GROUND);
@@ -138,7 +139,7 @@ public class BlocksMC1_14 implements BlockPropertiesSetup{
         }
 
         BlockInit.setPropsAs("GRINDSTONE", Material.COBBLESTONE);
-        BlockFlags.addFlags("GRINDSTONE", BlockFlags.SOLID_GROUND | BlockFlags.F_VARIABLE);
+        BlockFlags.addFlags("GRINDSTONE", BlockFlags.SOLID_GROUND);
 
         BlockInit.setPropsAs("CAMPFIRE", Material.OAK_PLANKS);
         BlockFlags.addFlags("CAMPFIRE", BlockFlags.SOLID_GROUND);
