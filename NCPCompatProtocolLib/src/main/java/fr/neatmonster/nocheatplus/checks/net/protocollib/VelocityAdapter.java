@@ -39,7 +39,7 @@ import fr.neatmonster.nocheatplus.players.IPlayerData;
  */
 public class VelocityAdapter extends BaseAdapter {
     private static PacketType[] initPacketTypes() {
-        final List<PacketType> types = new LinkedList<>(Collections.singletonLis(
+        final List<PacketType> types = new LinkedList<>(Collections.singletonList(
                 PacketType.Play.Server.EXPLOSION
                 //PacketType.Play.Server.ENTITY_VELOCITY
         ));
