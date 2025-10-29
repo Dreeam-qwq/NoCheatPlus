@@ -14,7 +14,6 @@
  */
 package fr.neatmonster.nocheatplus.checks.combined;
 
-import org.bukkit.Input;
 import org.bukkit.Location;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
@@ -31,7 +30,6 @@ import org.bukkit.event.entity.EntityPoseChangeEvent;
 import org.bukkit.event.entity.EntityToggleGlideEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
-import org.bukkit.event.player.PlayerInputEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerRiptideEvent;
@@ -46,7 +44,6 @@ import fr.neatmonster.nocheatplus.checks.CheckListener;
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.moving.MovingConfig;
 import fr.neatmonster.nocheatplus.checks.moving.MovingData;
-import fr.neatmonster.nocheatplus.checks.moving.model.InputDirection;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveInfo;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.VelocityFlags;
@@ -54,6 +51,7 @@ import fr.neatmonster.nocheatplus.compat.Bridge1_13;
 import fr.neatmonster.nocheatplus.compat.Bridge1_9;
 import fr.neatmonster.nocheatplus.compat.BridgeMisc;
 import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
+import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.components.NoCheatPlusAPI;
 import fr.neatmonster.nocheatplus.components.data.ICheckData;
 import fr.neatmonster.nocheatplus.components.data.IData;
@@ -140,16 +138,11 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
             });
         }
         if (BridgeMisc.hasPlayerInputEvent()) {
-            queuedComponents.add(new Listener() {
-                /**
-                 * See {@link PlayerMoveData#input} as for why we listen to this event.
-                 * @param event the input event
-                 */
-                @EventHandler(priority = EventPriority.MONITOR)
-                public void onInputChange(final PlayerInputEvent event) {
-                    onChangeOfInput(event.getInput(), event.getPlayer());
-                }
-            });
+            /**
+             * See {@link PlayerMoveData#input} as for why we listen to this event.
+             * @param event the input event
+             */
+            queuedComponents.add(new InputChangeListener());
         }
         if (Bridge1_13.hasPlayerRiptideEvent()) {
             queuedComponents.add(new Listener() {
@@ -187,22 +180,6 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
         final MovingData data = pData.getGenericInstance(MovingData.class);
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
         thisMove.tridentRelease = true;
-    }
-    
-    /**
-     * Sets the input data in this move.
-     * Do note that: 1) this is called only when the player toggles on/of a specific input (i.e.: press/release keys);
-     * 2) the input set here will be re-mapped in case of split moves.
-     *
-     * @param bukkitInput Input from the event.
-     * @param player
-     */
-    public void onChangeOfInput(Input bukkitInput, Player player) {
-        // TODO: Consider using packet input to tell which normal move change the input? But it require looping through packets. This should perform better on changing dir in normal moves
-        final IPlayerData pData = DataManager.getPlayerData(player);
-        final MovingData data = pData.getGenericInstance(MovingData.class);
-        final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
-        thisMove.input = new InputDirection(bukkitInput);
     }
 
     /** 
@@ -334,12 +311,75 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
         pData.setCrouching(false);
     }
     
+    private final boolean isLowerthan1_7 = ServerVersion.isLowerThan("1.7");
+    private final boolean isLowerthan1_8 = ServerVersion.isLowerThan("1.8");
+    private final boolean isLowerthan1_9 = ServerVersion.isLowerThan("1.9");
+    private final boolean isLowerthan1_10 = ServerVersion.isLowerThan("1.10");
+    private final boolean isLowerthan1_11_1 = ServerVersion.isLowerThan("1.11.1");
+    private final boolean isB1_11_2_1_12_1 = ServerVersion.isMinecraftVersionBetween("1.11.1", true, "1.12.2", false);
+    private final boolean isLowerthan1_13 = ServerVersion.isLowerThan("1.13");
+    private final boolean isLowerthan1_14 = ServerVersion.isLowerThan("1.14");
+    private final boolean isLowerthan1_15 = ServerVersion.isLowerThan("1.15");
+    private final boolean isLowerthan1_18 = ServerVersion.isLowerThan("1.18");
+    private final boolean is1_18 = ServerVersion.isMinecraftVersionBetween("1.18", true, "1.18.2", false);
+    private final boolean isLowerthan1_20 = ServerVersion.isLowerThan("1.20");
+    private final boolean isB1_20_1_20_5 = ServerVersion.isMinecraftVersionBetween("1.20", true, "1.20.6", false);
+    private final boolean isLowerthan1_21_2 = ServerVersion.isLowerThan("1.21.2");
+    
+    private ClientVersion configurePlayerVersion(final IPlayerData pData, final boolean debug) {
+        if (isLowerthan1_7) {
+            return ClientVersion.LOWER_THAN_KNOWN_VERSIONS;
+        }
+        if (isLowerthan1_8) {
+            return ClientVersion.V_1_7_10;
+        }
+        if (isLowerthan1_9) {
+            return ClientVersion.V_1_8;
+        }
+        if (isLowerthan1_10) {
+            return ClientVersion.V_1_9;
+        }
+        if (isLowerthan1_11_1) {
+            return ClientVersion.V_1_10;
+        }
+        if (isB1_11_2_1_12_1) {
+            return ClientVersion.V_1_11_1;
+        }
+        if (isLowerthan1_13) {
+            return ClientVersion.V_1_12_2;
+        }
+        if (isLowerthan1_14) {
+            return ClientVersion.V_1_13;
+        }
+        if (isLowerthan1_15) {
+            return ClientVersion.V_1_14;
+        }
+        if (isLowerthan1_18) {
+            return ClientVersion.V_1_17;
+        }
+        if (is1_18) {
+            return ClientVersion.V_1_18;
+        }
+        if (isLowerthan1_20) {
+            return ClientVersion.V_1_18_2;
+        }
+        if (isB1_20_1_20_5) {
+            return ClientVersion.V_1_20;
+        }
+        if (isLowerthan1_21_2) {
+            return ClientVersion.V_1_20_6;
+        }
+        return ClientVersion.HIGHER_THAN_KNOWN_VERSIONS;
+    }
+    
     @Override
     public void playerJoins(final Player player) {
         final IPlayerData pData = DataManager.getPlayerData(player);
         final CombinedData data = pData.getGenericInstance(CombinedData.class);
         final CombinedConfig cc = pData.getGenericInstance(CombinedConfig.class);
         final boolean debug = pData.isDebugActive(checkType);
+        // NCP will first set the ID version. If: protocolsupport/viaversion, cncp are all present, then CNCP will override the version set by protocolsupport/viaversion.
+        pData.setClientVersionID(configurePlayerVersion(pData, debug).getProtocolVersion());
         if (cc.invulnerableCheck 
             && (cc.invulnerableTriggerAlways || cc.invulnerableTriggerFallDistance && player.getFallDistance() > 0)) {
             // TODO: maybe make a heuristic for small fall distances with ground under feet (prevents future abuse with jumping) ?
@@ -367,7 +407,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
             }
         }
     }
-    
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawn(final PlayerRespawnEvent event) {
         final Player player = event.getPlayer();
@@ -423,7 +463,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
             return;
         }
         if (Bridge1_13.isSwimming(event.getPlayer()) || Bridge1_9.isGliding(event.getPlayer()) || Bridge1_13.isRiptiding(event.getPlayer())) {
-            // Bukkit's ambiguous "isSneaking()" method would return true for all these cases, but like we've said above, sneaking is determined by player poses, not shift key presses. Just ignore.
+            // Bukkit's ambiguous "isShift()" method would return true for all these cases, but like we've said above, sneaking is determined by player poses, not shift key presses. Just ignore.
             pData.setCrouching(false);
             return;
         }

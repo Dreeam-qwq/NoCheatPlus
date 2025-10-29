@@ -194,7 +194,8 @@ public class RichEntityLocation extends RichBoundsLocation {
         final Material supportingBlock = getBlockType((int) supportingBlockPos.getX(), (int) supportingBlockPos.getY(), (int) supportingBlockPos.getZ());
         final double[] AABB = getBoundingBox();
         return (BlockFlags.getBlockFlags(supportingBlock) & flag) != 0 
-               && BlockProperties.collidesBlock(blockCache, AABB[0],AABB[1],AABB[2],AABB[3],AABB[4],AABB[5], (int) supportingBlockPos.getX(),(int) supportingBlockPos.getY(),(int) supportingBlockPos.getZ(), getOrCreateBlockCacheNode(), null, flag);
+               && BlockProperties.collidesBlock(blockCache, AABB[0],AABB[1] - yOnGround,AABB[2],AABB[3],AABB[1],AABB[5], (int) supportingBlockPos.getX(),(int) supportingBlockPos.getY(),(int) supportingBlockPos.getZ(), 
+                       blockCache.getOrCreateBlockCacheNode(supportingBlockPos.getX(), supportingBlockPos.getY(), supportingBlockPos.getZ(), false), null, flag);
     }
     
     /**
@@ -268,7 +269,7 @@ public class RichEntityLocation extends RichBoundsLocation {
         }
         if (GenericVersion.isLowerThan(entity, "1.13")) {
             // Does not exist, but assume multiprotocol plugins to map it to regular ice.
-            if (onBlueIce) onIce = true;
+            if (super.isOnBlueIce()) onIce = true;
             onBlueIce = false; // Must stay false regardless.
             return onBlueIce; 
         }
@@ -305,6 +306,7 @@ public class RichEntityLocation extends RichBoundsLocation {
         if (GenericVersion.isLowerThan(entity, "1.13")) {
             // Does not exist.
             inBubbleStream = false;
+            // Perhaps inWater = true here? 
             return inBubbleStream;
         }
         return super.isInBubbleStream();

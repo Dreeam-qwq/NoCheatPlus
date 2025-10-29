@@ -14,12 +14,10 @@
  */
 package fr.neatmonster.nocheatplus.checks.moving.model;
 
-import org.bukkit.Input;
-import org.bukkit.entity.Player;
-import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.util.Vector;
 
 import fr.neatmonster.nocheatplus.checks.CheckType;
+import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
 import fr.neatmonster.nocheatplus.components.location.IGetLocationWithLook;
 import fr.neatmonster.nocheatplus.utilities.location.RichBoundsLocation;
 import fr.neatmonster.nocheatplus.utilities.math.TrigUtil;
@@ -129,18 +127,6 @@ public class MoveData {
      * apply.
      */
     public ModelFlying modelFlying;
-    
-    /**
-     * Track the inputs of the player (WASD, space bar, sprinting and jumping). <br> 
-     * The field is updated on {@link org.bukkit.event.player.PlayerInputEvent} (see {@link fr.neatmonster.nocheatplus.checks.combined.CombinedListener#onChangeOfInput(Input, Player)}).<p>
-     * This field is the one you should use to read input information during a PlayerMoveEvent, as it is kept synchronized with the correct movement on when the change of inputs happens.<br>
-     * Calling {@link org.bukkit.entity.Player#getCurrentInput()} on PlayerMoveEvents is unreliable, as it only provides the current input state
-     * at the time the move event is fired. It does not indicate when the input changed,
-     * thus, any change that occurred between events is lost, and we need to accurately keep track of them for moving checks. <p>
-     * The field is also re-mapped in the case a split move happens during PlayerMoveEvents (without it, the change of input would be out of sync with the actual movement).<br>
-     * See comment in {@link fr.neatmonster.nocheatplus.checks.moving.MovingListener#onPlayerMove(PlayerMoveEvent)} and {@link PlayerMoveData#multiMoveCount}.<p>
-     */
-    public InputDirection input = new InputDirection();
 
     private void setPositions(final IGetLocationWithLook from, final IGetLocationWithLook to) {
         this.from.setLocation(from);
@@ -250,14 +236,20 @@ public class MoveData {
     /**
      * Heuristic check to test if the player is likely to come to a full stop with the next move(s). <br>
      * When the client is coming to a full stop, lots of micro moves will be sent to the server (which are handled by the split move mechanism),
-     * but the actual stop of 0.0 distance won't be sent. <br>
+     * but the actual stop of 0.0 distance won't be sent, causing a false positive with the next move, because NCP would simply see a (very) small move from the last position to the new position, which is incorrect, because the player had been standing still in between. <br>
      * @return True, if the player has hDistance < 0.0071 and vertical distance smaller than the negligible speed threshold (legacy). 
-     *          In this case, toIsValid is set to false, so that further checks will not consider this move any longer.
+     *         In this case, toIsValid is set to false, so that further checks will not consider this move any longer.
      */
-    public boolean mightComeToAStop() {
-        if (toIsValid && hDistance < 0.0071 && Math.abs(yDistance) < Magic.NEGLIGIBLE_SPEED_THRESHOLD_LEGACY) {
-            toIsValid = false;
-            return true;
+    public boolean isPossibleStoppingMotion(final ClientVersion pVersion) {
+        if (pVersion.isAtLeast(ClientVersion.V_1_9)) {
+            // TODO: Find maximum possible value that can be before one more friction with input None, None
+            if (toIsValid 
+                && hDistance < (pVersion.isAtLeast(ClientVersion.V_1_21_5) ? 0.006 : 0.0071) 
+                && Math.abs(yDistance) < Magic.NEGLIGIBLE_SPEED_THRESHOLD_LEGACY) {
+                // Tell NCP that this move is no longer valid, so that checks will not consider this move any longer when initializing the momentum.
+                toIsValid = false;
+                return true;
+            }
         }
         return false;
     }

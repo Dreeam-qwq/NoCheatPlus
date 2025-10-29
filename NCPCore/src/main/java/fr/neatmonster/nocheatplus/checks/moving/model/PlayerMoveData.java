@@ -37,15 +37,6 @@ public class PlayerMoveData extends MoveData {
     // Reset with set, could be lazily set during checking.
     //////////////////////////////////////////////////////////
     // Properties of the player.
-    /** Whether this move has the levitation effect active */
-    public boolean hasLevitation;
-    
-    /** Whether this move has the slowfall effect active */
-    public boolean hasSlowfall;
-    
-    /** Whether this movement is influenced by gravity, as reported by {@link fr.neatmonster.nocheatplus.compat.BridgeMisc#hasGravity(LivingEntity)} */
-    public boolean hasGravity;
-    
     /** Player action set on {@link org.bukkit.event.player.PlayerMoveEvent}. NOTE: this is NOT the toggle glide moment, but the entire gliding phase. */
     public boolean isGliding;
     
@@ -54,27 +45,8 @@ public class PlayerMoveData extends MoveData {
     
     /** Represents how far the player is submerged in water. Set with {@link fr.neatmonster.nocheatplus.utilities.map.BlockProperties#getVerticalFrictionFactor(LivingEntity, Location, double, PlayerMoveData)} */
     public double submergedWaterHeight;
-
-    /** Player action set on {@link org.bukkit.event.player.PlayerMoveEvent}. */
-    public boolean slowedByUsingAnItem;
     
     public boolean tridentRelease;
-    
-    /** 
-     * Player action set on {@link org.bukkit.event.player.PlayerMoveEvent}. 
-     * NOTE: this is NOT the propelling moment triggered by {@link org.bukkit.event.player.PlayerRiptideEvent}, 
-     * it is the entire riptide phase (for which the game activates its tick counter (See ItemTrident.java, entityHuman.startAutoSpinAttack(20))
-     */
-    public boolean isRiptiding;
-    
-    /** Player action set on {@link org.bukkit.event.player.PlayerMoveEvent} */
-    public boolean isSprinting;
-    
-    /** Player action set on {@link org.bukkit.event.player.PlayerMoveEvent} */
-    public boolean isCrouching;
-    
-    /** Player action set on {@link org.bukkit.event.player.PlayerMoveEvent} */
-    public boolean isSwimming;
     
     /**
      * The distance covered by a move from the setback point to the to.getY() point.
@@ -147,9 +119,6 @@ public class PlayerMoveData extends MoveData {
     /** This move was an actual jump, as intended in its most common sense (jumping from the ground by pressing the space bar). */
     public boolean isJump;
     
-    /** Player-induced vertical motion by pressing the space bar. Doesn't necessarily mean that this motion is an actual jump (i.e.: pressing the space bar in liquids) */
-    public boolean isSpaceBarImpulse;
-    
     /** Highly uncertain movement: player might step up with this movement; we cannot know for sure. Set with lost-ground couldstep */
     public boolean couldStepUp;
     
@@ -166,8 +135,8 @@ public class PlayerMoveData extends MoveData {
     
     /**
      * Mojang introduced a new "mechanic" in 1.17 which allows player to re-send their position on right-clicking.
-     * On Bukkit's side, this translates in a {@link org.bukkit.event.player.PlayerMoveEvent} which doesn't have any movement change ({@link PlayerMoveEvent#getFrom()} and {@link PlayerMoveEvent#getTo()} contain the same location)
-     * This moving event is skipped from being processed.
+     * On Bukkit's side, this translates in a {@link org.bukkit.event.player.PlayerMoveEvent} which doesn't have any movement change: ({@link PlayerMoveEvent#getFrom()} and {@link PlayerMoveEvent#getTo()} contain the same location).<br>
+     * This moving event is skipped from being processed.<br>
      * Do note that players cannot send duplicate packets in a row: after we receive an "empty" PlayerMoveEvent, the next one incoming must have the actual movement change.
      * (Sequence is: normal PME -> duplicate PME -> normal PME(...))<br>
      * Fixed in 1.21.1.
@@ -202,7 +171,7 @@ public class PlayerMoveData extends MoveData {
      * <p>This value is set even if horizontal movement could not be accurately predicted, so it may be unreliable, unless the client sends impulse events, in which case it is dependable.
      * Check {@link PlayerMoveData#hasImpulse} for its reliability prior to version 1.21.2 </p>
      */
-    public InputDirection.StrafeDirection strafeImpulse;
+    public PlayerKeyboardInput.StrafeDirection strafeImpulse;
     
     /**
      * Indicates the forward movement direction (FORWARD, BACKWARD, or NONE).
@@ -210,7 +179,7 @@ public class PlayerMoveData extends MoveData {
      * <p>This value is set even if horizontal movement could not be accurately predicted, so it may be unreliable, unless the client sends impulse events, in which case it is dependable.
      * Check {@link PlayerMoveData#hasImpulse} for its reliability prior to version 1.21.2 </p>
      */
-    public InputDirection.ForwardDirection forwardImpulse;
+    public PlayerKeyboardInput.ForwardDirection forwardImpulse;
     
     /**
      * Judge if this horizontal collision ({@link PlayerMoveData#collideX} or {@link PlayerMoveData#collideZ}) is to be considered as minor.
@@ -233,21 +202,13 @@ public class PlayerMoveData extends MoveData {
     @Override
     protected void resetBase() {
         // Properties of the player.
-        hasLevitation = false;
-        hasSlowfall = false;
-        hasGravity = true; // Assume one to have gravity rather than the opposite... :)
         hasAttackSlowDown = false;
         submergedLavaHeight = 0.0;
         submergedWaterHeight = 0.0;
         isGliding = false;
-        isRiptiding = false;
-        isSprinting = false;
-        isCrouching = false;
-        isSwimming = false;
-        slowedByUsingAnItem = false;
         tridentRelease = false;
-        forwardImpulse = InputDirection.ForwardDirection.NONE;
-        strafeImpulse = InputDirection.StrafeDirection.NONE;
+        forwardImpulse = PlayerKeyboardInput.ForwardDirection.NONE;
+        strafeImpulse = PlayerKeyboardInput.StrafeDirection.NONE;
         // Properties involving the environment.
         bunnyHop = false;
         isStepUp = false;
@@ -268,7 +229,6 @@ public class PlayerMoveData extends MoveData {
         negligibleHorizontalCollision = false;
         collidesHorizontally = false;
         hasImpulse = AlmostBoolean.NO;
-        isSpaceBarImpulse = false;
         // Super class last, because it'll set valid to true in the end.
         super.resetBase();
     }

@@ -23,17 +23,20 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerInputEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 
 import fr.neatmonster.nocheatplus.NCPAPIProvider;
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.access.ACheckData;
+import fr.neatmonster.nocheatplus.checks.combined.InputChangeListener;
 import fr.neatmonster.nocheatplus.checks.moving.location.setback.DefaultSetBackStorage;
 import fr.neatmonster.nocheatplus.checks.moving.location.tracking.LocationTrace;
 import fr.neatmonster.nocheatplus.checks.moving.location.tracking.LocationTrace.TraceEntryPool;
-import fr.neatmonster.nocheatplus.checks.moving.model.InputDirection;
 import fr.neatmonster.nocheatplus.checks.moving.model.LiftOffEnvelope;
 import fr.neatmonster.nocheatplus.checks.moving.model.MoveConsistency;
 import fr.neatmonster.nocheatplus.checks.moving.model.MoveTrace;
+import fr.neatmonster.nocheatplus.checks.moving.model.PlayerKeyboardInput;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.model.VehicleMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.PairAxisVelocity;
@@ -90,12 +93,14 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     //////////////////////////////////////////////
     // Data shared between the moving checks    //
     //////////////////////////////////////////////
+    public float mcFallDistance = 0.0f;
     public List<Location> lastCollidingEntitiesLocations = null;
     /** Has leather boot on*/
     public boolean hasLeatherBoots = false;
     public double lastY = -64.0;
     /** Delay (in ticks) from jump to back on ground */
     public int jumpDelay;
+    /** Last levitation level, for levitation motion calculation */
     public double lastLevitationLevel;
     /** Count set back (re-) setting. */
     private int playerMoveCount = 0;
@@ -129,7 +134,7 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     public float lastFrictionHorizontal = 0.6f;
     /** Horizontal friction factor from NMS.*/
     public float nextFrictionHorizontal = 0.0f;
-    /** Inertia: friction * 0.91 */
+    /** Last Inertia: friction * 0.91 */
     public float lastInertia = 0.0f;
     /** Inertia: friction * 0.91 */
     public float nextInertia = 0.0f;
@@ -149,7 +154,9 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     public double nextFrictionVertical = 0.0;
     /** Ordinary vertical friction factor (lava, water, air) */
     public double lastFrictionVertical = 0.0;
+    /** Current gravity (normal, slowfall, custom)*/
     public double nextGravity = 0.0;
+    /** Last gravity (normal, slowfall, custom)*/
     public double lastGravity = 0.0;
 
     // *----------Move / Vehicle move tracking----------*
@@ -159,7 +166,7 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         public PlayerMoveData call() throws Exception {
             return new PlayerMoveData();
         }
-    }, 6); 
+    }, 4); 
     /** Keep track of currently processed (if) and past moves for vehicle moving. Stored moves can be altered by modifying the int. */
     // TODO: There may be need to store such data with vehicles, or detect tandem abuse in a different way.
     public final MoveTrace <VehicleMoveData> vehicleMoves = new MoveTrace<VehicleMoveData>(new Callable<VehicleMoveData>() {
@@ -168,6 +175,14 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
             return new VehicleMoveData();
         }
     }, 2);
+    /**
+     * Track the inputs of the player (WASD, space bar, sprinting and jumping). <br> 
+     * The field is updated on {@link org.bukkit.event.player.PlayerInputEvent} (see {@link InputChangeListener#onInputChange(PlayerInputEvent)}).<p>
+     * This field is the one you should use to read input information during a PlayerMoveEvent instead of {@link Player#getCurrentInput()}, as it is kept synchronized with the correct movement, in case Bukkit happens to skip PlayerMoveEvents, 
+     * causing a de-synchronization between inputs and movements (see comment in {@link MovingListener#onPlayerMove(PlayerMoveEvent)} and {@link PlayerMoveData#multiMoveCount}).<p>
+     * This data is stored in MovingData instead of the Moving trace, as the latter may be invalidated, overridden or otherwise wiped out, while the input state is still valid and needed for the next move(s); it is not suitable for long-term storage.
+     */
+    public PlayerKeyboardInput input = new PlayerKeyboardInput();
 
     // *----------Velocity handling----------* 
     /** Tolerance value for using vertical velocity (the client sends different values than received with fight damage). */
@@ -229,9 +244,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     public int sfVLMoveCount = 0;
     /** Count in air events for this jumping phase, resets when landing on ground, with set-backs and similar. */
     public int sfJumpPhase = 0;
-    /** "Dirty" flag, for receiving velocity and similar while in air. */
-    @Deprecated
-    private boolean sfDirty = false;
     /** Basic envelope constraints/presets for lifting off ground. */
     public LiftOffEnvelope liftOffEnvelope = defaultLiftOffEnvelope;
     /** Counting while the player is not on ground and not moving. A value < 0 means not hovering at all. */
@@ -338,7 +350,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         removeAllPlayerSpeedModifiers();
         clearWindChargeImpulse();
         sfHoverTicks = sfHoverLoginTicks = -1;
-        sfDirty = false;
         liftOffEnvelope = defaultLiftOffEnvelope;
         vehicleConsistency = MoveConsistency.INCONSISTENT;
         verticalBounce = null;
@@ -368,7 +379,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         // Keep jump amplifier
         // keep jump phase.
         sfHoverTicks = -1; // 0 ?
-        sfDirty = false;
         liftOffEnvelope = defaultLiftOffEnvelope;
         removeAllPlayerSpeedModifiers();
         vehicleConsistency = MoveConsistency.INCONSISTENT; // Not entirely sure here.
@@ -428,8 +438,8 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         thisMove.zAllowedDistance = 0.0;
         thisMove.hAllowedDistance = 0.0;
         thisMove.hasImpulse = AlmostBoolean.NO;
-        thisMove.strafeImpulse = InputDirection.StrafeDirection.NONE;
-        thisMove.forwardImpulse = InputDirection.ForwardDirection.NONE;
+        thisMove.strafeImpulse = PlayerKeyboardInput.StrafeDirection.NONE;
+        thisMove.forwardImpulse = PlayerKeyboardInput.ForwardDirection.NONE;
     }
 
 
@@ -492,7 +502,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
      */
     private void resetPlayerPositions() {
         playerMoves.invalidate();
-        sfDirty = false;
         liftOffEnvelope = defaultLiftOffEnvelope;
         verticalBounce = null;
         blockChangeRef.valid = false;
@@ -855,9 +864,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         if (vx != 0.0 || vz != 0.0) {
             horVel.add(new PairEntry(tick, vx, vz, cc.velocityActivationCounter));
         }
-
-        // Set dirty flag here.
-        sfDirty = true; // TODO: Set on using the velocity, due to latency !
     }
 
 
@@ -867,7 +873,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     public void removeAllVelocity() {
         horVel.clear();
         verVel.clear();
-        sfDirty = false;
     }
 
 
@@ -907,11 +912,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         //horVel.tick();
 
         // (Vertical velocity does not tick.)
-
-        // Renew the dirty phase.
-        if (!sfDirty && horVel.hasQueued()) {
-            sfDirty = true;
-        }
     }
 
 
@@ -1005,9 +1005,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
      */
     public List<PairEntry> useHorizontalVelocity(final double x, final double z) {
         final List<PairEntry> available = horVel.use(x, z, 0.001);
-        if (!available.isEmpty()) {
-            sfDirty = true;
-        }
         return available;
     }
 
@@ -1097,7 +1094,6 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         final List<SimpleEntry> available = verVel.use(amount, Magic.PREDICTION_EPSILON);
         if (available != null) {
             playerMoves.getCurrentMove().verVelUsed = available;
-            sfDirty = true;
         }
         return available;
     }

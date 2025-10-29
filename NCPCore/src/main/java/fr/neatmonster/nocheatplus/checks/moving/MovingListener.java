@@ -64,7 +64,6 @@ import fr.neatmonster.nocheatplus.checks.inventory.Open;
 import fr.neatmonster.nocheatplus.checks.moving.envelope.BounceHandler;
 import fr.neatmonster.nocheatplus.checks.moving.envelope.PhysicsEnvelope;
 import fr.neatmonster.nocheatplus.checks.moving.model.BounceType;
-import fr.neatmonster.nocheatplus.checks.moving.model.InputDirection;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveInfo;
 import fr.neatmonster.nocheatplus.checks.moving.player.CreativeFly;
@@ -82,16 +81,16 @@ import fr.neatmonster.nocheatplus.checks.net.model.DataPacketFlying;
 import fr.neatmonster.nocheatplus.checks.net.model.DataPacketInput;
 import fr.neatmonster.nocheatplus.compat.Bridge1_13;
 import fr.neatmonster.nocheatplus.compat.Bridge1_9;
-import fr.neatmonster.nocheatplus.compat.bukkit.BridgeEnchant;
-import fr.neatmonster.nocheatplus.compat.bukkit.BridgeEntityType;
-import fr.neatmonster.nocheatplus.compat.bukkit.BridgeHealth;
 import fr.neatmonster.nocheatplus.compat.BridgeMisc;
-import fr.neatmonster.nocheatplus.compat.bukkit.BridgePotionEffect;
 import fr.neatmonster.nocheatplus.compat.MCAccess;
 import fr.neatmonster.nocheatplus.compat.SchedulerHelper;
 import fr.neatmonster.nocheatplus.compat.blocks.changetracker.BlockChangeTracker;
 import fr.neatmonster.nocheatplus.compat.blocks.changetracker.BlockChangeTracker.BlockChangeEntry;
 import fr.neatmonster.nocheatplus.compat.blocks.changetracker.BlockChangeTracker.Direction;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeEnchant;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeEntityType;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgeHealth;
+import fr.neatmonster.nocheatplus.compat.bukkit.BridgePotionEffect;
 import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
 import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.components.NoCheatPlusAPI;
@@ -701,10 +700,11 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         }
         // Feed combined check.
         final CombinedData data = pData.getGenericInstance(CombinedData.class);
+        final MovingData mData = pData.getGenericInstance(MovingData.class);
         data.lastMoveTime = now; 
+        mData.mcFallDistance = player.getFallDistance();
         final Location from = event.getFrom();
         // Feed yawrate and reset moving data positions if necessary.
-        final MovingData mData = pData.getGenericInstance(MovingData.class);
         final int tick = TickTask.getTick();
         final MovingConfig mCc = pData.getGenericInstance(MovingConfig.class);
         if (!event.isCancelled()) {
@@ -849,16 +849,15 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Split the event into separate moves and re-map inputs, or correct the looking data, if suitable.          //
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
-        // This mechanic is needed due to Bukkit not always firing PlayerMoveEvent(s) with each flying packet:
-        // 1) In some cases, a single PlayerMoveEvent can be the result of multiple flying packets.
-        // 2) Bukkit has thresholds for firing PlayerMoveEvents (1f/256 for distance and 10f for looking direction - PlayerConnection.java). 
+        // This mechanic is needed due to Bukkit not always firing PlayerMoveEvent(s) with each flying packet. In some cases, a single PlayerMoveEvent can be the result of multiple flying packets:
+        // 1) Bukkit has thresholds for firing PlayerMoveEvents (1f/256 for distance and 10f for looking direction - PlayerConnection.java). 
         //    This will result in movements that don't have a significant change to be skipped. 
         //    With anticheating, this means that micro and very slow moves cannot be checked accurately (or at all, for that matter), as coordinates will not be reported correctly for the subsequent event.
-        // 3) On MC 1.19.4 and later, PlayerMoveEvents are skipped altogether upon entering a minecart and fired normally when exiting.
-        // 4) Even on regular movements, the player's look information (pitch/yaw) can be incorrect (idle packet).
+        // 2) On MC 1.19.4 and later, PlayerMoveEvents are skipped altogether upon entering a minecart and fired normally when exiting.
+        // 3) Even on regular movements, the player's look information (pitch/yaw) can be incorrect (idle packet).
         // In fact, one could argue that the event's nomenclature is misleading: Bukkit's PlayerMoveEvent doesn't actually monitor move packets but rather *changes* of movement between packets.
         // Now, to fix this, we'd need to re-code NCP to run movement checks on packet-level instead. Such an option isn't feasible: it would require a massive re-work which we don't have the manpower for, hence this mechanic which -albeit convoluted- works well.
-        // Essentially, after Bukkit fires a PlayerMoveEvent, NCP will check if it had been fired normally. If it wasn't, the flying-packet queue is used to get the correct "from" and "to" locations.
+        // Essentially, after Bukkit fires a PlayerMoveEvent, NCP will check if it had been fired normally. If it wasn't, the flying-packet queue is used to know how many moves were skipped on Bukkit-level and reconstruct the correct from/to positions.
         // (Overall, this forces NCP to pretty much hard-depend on ProtocolLib, but it's the most sensible choice anyway, as working with Bukkit events has proven to be unreliable on the longer run)
         // (For simplicity, the mechanic is internally referred to as "split move", because the event is essentially split by how many moves were lost, with a cap)
         final PlayerMoveInfo moveInfo = aux.usePlayerMoveInfo();
@@ -965,38 +964,21 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                 // 2: Filter out null and ground only packets; synchronize the input change with the correct flying packet on when it happened
                 final DataPacketInput[] inputQueue = pData.getGenericInstance(NetData.class).copyInputQueue();
                 // Prepare array to hold the filtered packets between fromIndex and toIndex (inclusive). 
-                final DataPacketFlying[] filteredFlyingQueue = new DataPacketFlying[fromIndex - toIndex + 1]; 
-                // Prepare array to hold the input packets that happened during the filtered flying packets.
-                final DataPacketInput[] filteredInputQueue = new DataPacketInput[fromIndex - toIndex + 1];
+                final DataPacketFlying[] filteredFlyingQueue = new DataPacketFlying[fromIndex - toIndex + 1];
                 int j = 0;
-                int t = 0, si = 0, ei = inputQueue.length; // Input re-mapping variables
                 // NOTE: Inverted from last versions for easier code
                 for (int i = toIndex; i <= fromIndex; i++) {
                     // (Let the early return above handle duplicate 1.17 packets)
                     if (flyingQueue[i] != null && (flyingQueue[i].hasPos || flyingQueue[i].hasLook)) {
                         // All valid flying packets are put in their array
                         filteredFlyingQueue[j] = flyingQueue[i];
-                        // Re-mapping input
-                        boolean found = false;
-                        si = i + 1; // Input happened before flying
-                        for (t = si; t < ei; t++) {
-                            if (inputQueue[t] != null) {
-                                filteredInputQueue[j] = inputQueue[t];
-                                ei = t;
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            ei = i + 1;
-                        }
                         j++;
                     }
                 }
                 // 3: Actual split
                 int count = 1;
                 // The maximum amount by which a single PlayerMoveEvent can be split.
-                int maxSplit = 14;
+                int maxSplit = 20;
                 float currentYaw = from.getYaw();
                 float currentPitch = from.getPitch();
                 Location packet = null;
@@ -1015,10 +997,10 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                             Location packetTo = count >= maxSplit ? to : new Location(from.getWorld(), filteredFlyingQueue[i].getX(), filteredFlyingQueue[i].getY(), filteredFlyingQueue[i].getZ(), currentYaw, currentPitch);
                             // Finally, set the moving data to be used by checks.
                             moveInfo.set(player, packet, packetTo, cc.yOnGround);
-                            // Finally, remap the input for this move, if any.
-                            if (filteredInputQueue[i] != null) {
-                                final PlayerMoveData newthisMove = data.playerMoves.getCurrentMove();
-                                newthisMove.input = new InputDirection(Boolean.compare(filteredInputQueue[i].left, filteredInputQueue[i].right), Boolean.compare(filteredInputQueue[i].forward, filteredInputQueue[i].backward));
+                            // Finally, remap the input for this move.
+                            final int inputIdx = i + 1;
+                            if (inputQueue[inputIdx] != null) {
+                                data.input.set(Boolean.compare(inputQueue[inputIdx].left, inputQueue[inputIdx].right), Boolean.compare(inputQueue[inputIdx].forward, inputQueue[inputIdx].backward), inputQueue[inputIdx].jump, inputQueue[inputIdx].shift, inputQueue[inputIdx].sprint);
                             }
                             if (debug) {
                                 final String s1 = count == 1 ? "from" : "loc";
@@ -1197,17 +1179,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         thisMove.set(pFrom, pTo);
         thisMove.multiMoveCount = multiMoveCount;
         thisMove.setBackYDistance = pTo.getY() - data.getSetBackY();
-        thisMove.hasLevitation = !Double.isInfinite(Bridge1_9.getLevitationAmplifier(player));
-        thisMove.hasSlowfall = !Double.isInfinite(Bridge1_13.getSlowfallingAmplifier(player));
-        thisMove.hasGravity = BridgeMisc.hasGravity(player);
         thisMove.isGliding = Bridge1_9.isGliding(player);
-        thisMove.isRiptiding = Bridge1_13.isRiptiding(player);
-        thisMove.isSprinting = pData.isSprinting();
-        thisMove.isCrouching = pData.isInCrouchingPose();
-        thisMove.isSwimming = Bridge1_13.isSwimming(player);
-        thisMove.slowedByUsingAnItem = BridgeMisc.isUsingItem(player);
-        if (BridgeMisc.isSpaceBarImpulseKnown(player)) thisMove.isSpaceBarImpulse = player.getCurrentInput().isJump();
-
 
         ////////////////////////////
         // Potion effect "Jump".  //
@@ -1521,9 +1493,6 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
             // TODO: More simple: UUID keys or a data flag instead?
             if (processingEvents.containsKey(playerName)) {
                 data.playerMoves.finishCurrentMove();
-                // Fundamental for the correct queueing of the input in the moving trace.
-                // When the input of the player changes, it has to be set in the current move and carried forward onto the next moves, until it changes again.
-                data.playerMoves.getCurrentMove().input = thisMove.input; 
             }
             // Teleport during violation processing, just invalidate thisMove.
             else thisMove.invalidate();
@@ -2262,6 +2231,9 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
 
         // Hover.
         initHover(player, data, cc, data.playerMoves.getFirstPastMove().from.onGroundOrResetCond);
+        // TODO: Thing are more complicated than just gravity. Friction too and other medium properties when join!
+        // TODO: last is use in calculating but doesn't init(because there no last move yet) when first time join leading to false positives
+        data.lastGravity = attributeAccess.getHandle().getGravity(player);
 
         // Check for vehicles.
         // TODO: Order / exclusion of items.

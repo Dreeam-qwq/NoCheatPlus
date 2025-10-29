@@ -586,7 +586,6 @@ public abstract class ConfPaths {
     public static final String  MOVING_CREATIVEFLY_MODEL                 = MOVING_CREATIVEFLY + SUB_MODEL + ".";
     public static final String  MOVING_CREATIVEFLY_ACTIONS               = MOVING_CREATIVEFLY + "actions";
     public static final String  MOVING_CREATIVEFLY_EYTRA_FWRESET         = MOVING_CREATIVEFLY_MODEL + "elytra.reset-Fw-Onground";
-    public static final String  MOVING_CREATIVEFLY_EYTRA_STRICT          = MOVING_CREATIVEFLY_MODEL + "elytra.strict";
 
     private static final String MOVING_MOREPACKETS                       = MOVING + "morepackets.";
     public static final String  MOVING_MOREPACKETS_CHECK                 = MOVING_MOREPACKETS + SUB_ACTIVE;
@@ -635,7 +634,6 @@ public abstract class ConfPaths {
     public static final String MOVING_SURVIVALFLY_LENIENCY_FREEZEINAIR      = MOVING_SURVIVALFLY_LENIENCY + "freeze-inair";
     private static final String MOVING_SURVIVALFLY_SETBACKPOLICY            = MOVING_SURVIVALFLY + "setback-policy.";
     public static final String MOVING_SURVIVALFLY_SETBACKPOLICY_FALLDAMAGE  = MOVING_SURVIVALFLY_SETBACKPOLICY + "falldamage";
-    public static final String MOVING_SURVIVALFLY_SETBACKPOLICY_VOIDTOVOID  = MOVING_SURVIVALFLY_SETBACKPOLICY + "void-to-void";
     public static final String MOVING_SURVIVALFLY_ACTIONS                   = MOVING_SURVIVALFLY + "actions";
     private static final String MOVING_SURVIVALFLY_VLFREQUENCY              = MOVING_SURVIVALFLY_LENIENCY + "violationfrequency.";
     public static final String MOVING_SURVIVALFLY_VLFREQUENCY_ACTIVE        = MOVING_SURVIVALFLY_VLFREQUENCY + "active";
@@ -832,6 +830,10 @@ public abstract class ConfPaths {
     public static final String  MOVING_MOREPACKETSVEHICLE_ACTIONS        = "checks.moving.morepacketsvehicle.actions";
 
     // Deprecated paths (just removed).
+    @Deprecated
+    public static final String  MOVING_CREATIVEFLY_EYTRA_STRICT          = MOVING_CREATIVEFLY_MODEL + "elytra.strict";
+    @Deprecated
+    public static final String MOVING_SURVIVALFLY_SETBACKPOLICY_VOIDTOVOID  = MOVING_SURVIVALFLY_SETBACKPOLICY + "void-to-void";
     @Deprecated
     public static final String COMBINED_MUNCHHAUSEN                         = COMBINED + "munchhausen.";
     @Deprecated

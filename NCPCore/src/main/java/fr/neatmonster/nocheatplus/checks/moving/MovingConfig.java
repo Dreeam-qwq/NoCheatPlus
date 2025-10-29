@@ -92,6 +92,10 @@ public class MovingConfig extends ACheckConfig {
     public final boolean passableUntrackedCommandTryTeleport;
     public final SimpleCharPrefixTree passableUntrackedCommandPrefixes = new SimpleCharPrefixTree();
    
+    /** 
+     * Because we now use a prediction model, the step height value must always match vanilla, meaning this config option cannot be changed anymore.
+     * (Unless servers admin use both a modified client and a modified server which both allow a different step height 
+     */
     public final double sfStepHeight;
     public final boolean survivalFlyResetItem;
     public boolean survivalFlyStrictHorizontal;
@@ -99,7 +103,6 @@ public class MovingConfig extends ACheckConfig {
     public final long survivalFlyVLFreezeCount;
     public final boolean survivalFlyVLFreezeInAir;
     // Set back policy.
-    public final boolean sfSetBackPolicyVoid;
     public final boolean sfSetBackPolicyFallDamage;
     public final ActionList survivalFlyActions;
 
@@ -132,7 +135,6 @@ public class MovingConfig extends ACheckConfig {
     public final boolean trackBlockMove;
     public final PlayerSetBackMethod playerSetBackMethod;
     public final boolean resetFwOnground;
-    public final boolean elytraStrict;
 
     // Vehicles
     public final boolean vehicleEnforceLocation;
@@ -175,7 +177,6 @@ public class MovingConfig extends ACheckConfig {
         }
 
         resetFwOnground = config.getBoolean(ConfPaths.MOVING_CREATIVEFLY_EYTRA_FWRESET);
-        elytraStrict = config.getBoolean(ConfPaths.MOVING_CREATIVEFLY_EYTRA_STRICT);
         creativeFlyActions = config.getOptimizedActionList(ConfPaths.MOVING_CREATIVEFLY_ACTIONS, Permissions.MOVING_CREATIVEFLY);
 
         morePacketsEPSIdeal = config.getInt(ConfPaths.MOVING_MOREPACKETS_EPSIDEAL);
@@ -206,7 +207,6 @@ public class MovingConfig extends ACheckConfig {
         survivalFlyResetItem = config.getBoolean(ConfPaths.MOVING_SURVIVALFLY_EXTENDED_RESETITEM);
         survivalFlyStrictHorizontal = config.getBoolean(ConfPaths.MOVING_SURVIVALFLY_EXTENDED_STRICT_HORIZONTAL_PREDICTION);
         sfSetBackPolicyFallDamage = config.getBoolean(ConfPaths.MOVING_SURVIVALFLY_SETBACKPOLICY_FALLDAMAGE);
-        sfSetBackPolicyVoid = config.getBoolean(ConfPaths.MOVING_SURVIVALFLY_SETBACKPOLICY_VOIDTOVOID);
         final double sfStepHeight = config.getDouble(ConfPaths.MOVING_SURVIVALFLY_STEPHEIGHT, Double.MAX_VALUE);
         if (sfStepHeight == Double.MAX_VALUE) {
             final String ref;
@@ -313,7 +313,6 @@ public class MovingConfig extends ACheckConfig {
 
         final GameMode gameMode = player.getGameMode();
         final ModelFlying modelGameMode = flyingModelGameMode.get(gameMode);
-        final long now = System.currentTimeMillis();
         switch(gameMode) {
             case SURVIVAL:
             case ADVENTURE:

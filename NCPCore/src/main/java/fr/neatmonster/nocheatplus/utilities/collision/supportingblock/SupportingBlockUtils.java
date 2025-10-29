@@ -76,8 +76,11 @@ public class SupportingBlockUtils {
                                     ((z == minBlockZ || z == maxBlockZ) ? 1 : 0);
                     if (edgeCount != 3 && (edgeCount != 1 || (BlockFlags.getBlockFlags(mat) & BlockFlags.F_HEIGHT150) != 0) // isShapeExceedsCube...
                         && (edgeCount != 2 || mat == BridgeMaterial.MOVING_PISTON)) {
-                        if (AxisAlignedBBUtils.isIntersected(blockCache.getBounds(x, y, z), eAABB)) {
-                            collisionsLoc.add(new Vector(x, y, z));
+                        final double[] originAABB = blockCache.fetchBounds(x, y, z);
+                        if (originAABB != null) {
+                            if (AxisAlignedBBUtils.isIntersected(x, y, z, originAABB, eAABB)) {
+                                collisionsLoc.add(new Vector(x, y, z));
+                            }
                         }
                     }
                 }
@@ -169,7 +172,7 @@ public class SupportingBlockUtils {
             Vector blockLocAsVector3d = blockLocation.clone().add(new Vector(0.5, 0.5, 0.5));
             double currentDistance = correctedPlayerLoc.distanceSquared(blockLocAsVector3d);
             if (currentDistance < lastDistance 
-                || (currentDistance == lastDistance && lastBlockLocation != null && compareTo(blockLocation, lastBlockLocation))) {
+                || currentDistance == lastDistance && (lastBlockLocation == null || compareTo(blockLocation, lastBlockLocation))) {
                 lastBlockLocation = blockLocation;
                 lastDistance = currentDistance;
             }
@@ -193,11 +196,9 @@ public class SupportingBlockUtils {
      * @return {@code true} if the first location has priority over the second, otherwise {@code false}.
      */
     private static boolean compareTo(Vector first, Vector second) {
-        if (first.getY() != second.getY()) {
-            return first.getY() < second.getY(); // Lowest Y has priority
+        if (first.getY() < second.getY()) {
+            return true; // Lowest Y has priority
         }
-        int deltaX = (int) (second.getX() - first.getX());
-        int deltaZ = (int) (second.getZ() - first.getZ());
-        return deltaX + deltaZ < 0 || (deltaX == 0 && deltaZ < 0); // Lowest X and Z have priority
+        return first.getZ() == second.getZ() ? first.getX() < second.getX() : first.getZ() < second.getZ(); // Lowest X and Z have priority
     }
 }

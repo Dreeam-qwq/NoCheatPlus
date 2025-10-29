@@ -16,6 +16,8 @@ package fr.neatmonster.nocheatplus.checks.moving.envelope.workaround;
 
 import org.bukkit.entity.Player;
 
+import fr.neatmonster.nocheatplus.checks.combined.CombinedData;
+import fr.neatmonster.nocheatplus.checks.moving.MovingConfig;
 import fr.neatmonster.nocheatplus.checks.moving.MovingData;
 import fr.neatmonster.nocheatplus.checks.moving.envelope.PhysicsEnvelope;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
@@ -85,7 +87,8 @@ public class MagicWorkarounds {
     }
 
     /**
-     * Several non-predictable moves with levitation
+     * Several non-predictable moves with levitation<br>
+     * Precondition: player was levitating the tick before this move.
      * 
      * @param data
      * @param player
@@ -97,6 +100,7 @@ public class MagicWorkarounds {
         final IPlayerData pData = DataManager.getPlayerData(player);
         final PlayerMoveData lastMove = data.playerMoves.getFirstPastMove();
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
+        final CombinedData cData = pData.getGenericInstance(CombinedData.class);
         return  
 
                /*
@@ -120,7 +124,7 @@ public class MagicWorkarounds {
                      && thisMove.yDistance < data.liftOffEnvelope.getJumpGain(Bridge1_9.getLevitationAmplifier(player) - 1, data.nextStuckInBlockVertical) * data.lastFrictionVertical
                      // 1: Don't know what's going on here: when receiving levitation, the client "stalls" server-side for a tick. They'll begin to levitate on the next tick.
                      // https://gyazo.com/9ea2d76301bcfd5bc10dca2c6db77e63
-                     || thisMove.hasLevitation && !lastMove.hasLevitation && fromOnGround && toOnGround && thisMove.yDistance == 0.0
+                     || !Double.isInfinite(Bridge1_9.getLevitationAmplifier(player)) && !cData.wasLevitating && fromOnGround && toOnGround && thisMove.yDistance == 0.0
                 )
                 && data.ws.use(WRPT.W_M_SF_FIRST_MOVE_ASCNEDING_FROM_GROUND)
                /*
@@ -159,12 +163,13 @@ public class MagicWorkarounds {
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
         final PlayerMoveData secondLastMove = data.playerMoves.getSecondPastMove();
         final IPlayerData pData = DataManager.getPlayerData(player);
-        final double yAcceleration = thisMove.yDistance - lastMove.yDistance;
+        final MovingConfig cc = pData.getGenericInstance(MovingConfig.class);
 
         if (Bridge1_9.isGliding(player)) {
             return oddGliding(data, player, from, fromOnGround, to, toOnGround, isNormalOrPacketSplitMove);
         }
-        if (lastMove.hasLevitation) {
+        final CombinedData cData = pData.getGenericInstance(CombinedData.class);
+        if (cData.wasLevitating) {
             return oddLevitation(data, player, from, fromOnGround, isNormalOrPacketSplitMove, toOnGround);
         }
         if (from.isInLiquid()) {
@@ -206,7 +211,7 @@ public class MagicWorkarounds {
                 * TODO: This needs to be handled in a more decent way in RichEntityLocation. Will be removed.
                 * TODO: Does this actually work?
                 */
-                || data.noFallFallDistance > 2.5 && thisMove.from.inPowderSnow && !lastMove.from.inPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
+                || player.getFallDistance() > 2.5 && thisMove.from.inPowderSnow && !lastMove.from.inPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
                 && data.ws.use(WRPT.W_M_SF_LANDING_ON_PWDSNW_FALLDIST_25)
                /*
                 * 0: Allow the subsequent move of the one above as well, as it will still yield a false positive.
@@ -215,6 +220,22 @@ public class MagicWorkarounds {
                 */
                 || thisMove.to.inPowderSnow && !secondLastMove.from.inPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
                 && data.ws.use(WRPT.W_M_SF_LANDING_ON_PWDSNW_FALLDIST_25)
-        ;
+                /*
+                 * 0: With players breaking blocks beneath them.
+                 * When a player breaks a block below them, several 0-yDistance moves will be sent to the server, while being off the ground (seemingly hovering above the just broken block) 
+                 * After these moves, the player speeds down to the ground, landing on it.
+                 * With sfHoverTicks with multiMoveCount covered they near ground and all moves no more than Bukkit's min movement threshold
+                 * The client sent data to server but not firing PlayerMoveEvent because of the min movement threshold and stack till next PME
+                 */
+                || thisMove.yDistance == 0.0 && data.sfHoverTicks <= 1
+                && thisMove.multiMoveCount > 0 && thisMove.multiMoveCount <= 17 && PhysicsEnvelope.inAir(thisMove)
+                && data.ws.use(WRPT.W_M_SF_DIGGING_DOWN)
+                /*
+                 * 0: Same case as above, but with a small y-distance (due to gravity).
+                 */
+                || lastMove.yDistance < 0.0 && data.sfHoverTicks <= cc.sfHoverTicks
+                && thisMove.multiMoveCount > 0 && thisMove.multiMoveCount <= 2 && PhysicsEnvelope.inAir(thisMove)
+                && data.ws.use(WRPT.W_M_SF_DIGGING_DOWN_2)
+                ;
     }
 }
