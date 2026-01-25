@@ -73,6 +73,12 @@
             <version>4.26.1</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <version>3.53.0</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
 </project>
