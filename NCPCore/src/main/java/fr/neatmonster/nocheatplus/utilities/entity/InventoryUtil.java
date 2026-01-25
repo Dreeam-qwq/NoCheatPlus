@@ -25,9 +25,9 @@ import java.util.Set;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
@@ -37,7 +37,7 @@ import fr.neatmonster.nocheatplus.checks.inventory.InventoryData;
 import fr.neatmonster.nocheatplus.compat.Bridge1_9;
 import fr.neatmonster.nocheatplus.compat.BridgeMisc;
 import fr.neatmonster.nocheatplus.compat.MCAccess;
-import fr.neatmonster.nocheatplus.compat.bukkit.BridgeBukkitAPI;
+import fr.neatmonster.nocheatplus.compat.registry.BukkitAPIAccessFactory;
 import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.components.registry.event.IGenericInstanceHandle;
 import fr.neatmonster.nocheatplus.players.DataManager;
@@ -169,8 +169,8 @@ public class InventoryUtil {
      *            the reference
      * @return the stack count
      */
-    public static int getStackCount(final InventoryView view, final ItemStack reference) {
-        return getStackCount(view.getBottomInventory(), reference) + getStackCount(view.getTopInventory(), reference);
+    public static int getStackCount(final InventoryClickEvent event, final ItemStack reference) {
+        return getStackCount(BukkitAPIAccessFactory.getBukkitAccess().getBottomInventory(event), reference) + getStackCount(BukkitAPIAccessFactory.getBukkitAccess().getTopInventory(event), reference);
     }
 
     //    /**
@@ -201,7 +201,7 @@ public class InventoryUtil {
      * @return True, if the opened inventory is of any type that isn't CRAFTING/CREATIVE and is not null.
      */
     public static boolean hasInventoryOpenOwnExcluded(final Player player) {
-        return BridgeBukkitAPI.hasInventoryOpenOwnExcluded(player);
+        return BukkitAPIAccessFactory.getBukkitAccess().hasInventoryOpenOwnExcluded(player);
     }
 
    /**

@@ -825,6 +825,8 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                 prepareSetBack(player, event, newTo, data, cc, pData); // Logs set back details.
             }
             data.joinOrRespawn = false;
+            data.hasLeatherBoots = BridgeMisc.canStandOnPowderSnow(player);
+            data.lastY = from.getY();
             return;
         }
         // TODO: Is this right place? Just throw in entity/player in blockcache is better or this one? Too tired for now, maybe later
@@ -917,6 +919,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
 //            }
             
             // Normal move: fire from -> to
+            if (BridgeMisc.isWASDImpulseKnown(player)) data.input.set(player.getCurrentInput());
             moveInfo.set(player, from, to, cc.yOnGround);
             checkPlayerMove(player, from, to, 0, moveInfo, debug, data, cc, pData, event, true);
         }
@@ -1180,6 +1183,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         thisMove.multiMoveCount = multiMoveCount;
         thisMove.setBackYDistance = pTo.getY() - data.getSetBackY();
         thisMove.isGliding = Bridge1_9.isGliding(player);
+        thisMove.tridentRelease = data.consumeTridentReleaseEvent();
 
         ////////////////////////////
         // Potion effect "Jump".  //

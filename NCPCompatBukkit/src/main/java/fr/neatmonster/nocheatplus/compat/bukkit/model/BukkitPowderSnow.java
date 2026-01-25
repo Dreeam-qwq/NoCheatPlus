@@ -16,36 +16,38 @@ package fr.neatmonster.nocheatplus.compat.bukkit.model;
 
 import org.bukkit.World;
 
+import fr.neatmonster.nocheatplus.checks.moving.MovingData;
+import fr.neatmonster.nocheatplus.players.IPlayerData;
 import fr.neatmonster.nocheatplus.utilities.map.BlockCache;
 
 public class BukkitPowderSnow implements BukkitShapeModel {
 
-    // Powder snow have collision of full block most of the time, but it allow to move through. We keep full block for stuck in block speed!
-    //double[] NO_COLLISION = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
-    double[] FULL_BLOCK = {0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
-    
+    // Some what behave like ladder
     double[] REDUCED_HEIGHT = {0.0, 0.0, 0.0, 1.0, 0.9, 1.0};
+    double[] FULL_HEIGHT = {0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
 
     @Override
     public double[] getShape(BlockCache blockCache, World world, int x, int y, int z) {
-        // IPlayerData pData = blockCache.getPlayerData();
-        //System.out.println("psnow 0");
-        /*if (pData != null) {
+        IPlayerData pData = blockCache.getPlayerData();
+        if (pData != null) {
             MovingData data = pData.getGenericInstance(MovingData.class);
-            // TODO: Make NoFall no dealing damage on this block
-            //System.out.println("psnow 1 " + data.lastY + ">" + (y + 1 - 1e-5) + " " + data.hasLeatherBoots + " " + !pData.isShiftKeyPressed());
-            // Nothing to do with the shape, should be workarounds in onGround logic
-            //if (data.lastY > (y - 1e-5) && data.hasLeatherBoots && !pData.isShiftKeyPressed()) {
-            //    //System.out.println("psnow 2");
-            //    return FULL_BLOCK;
-            //}
-            // Give up, too hard to properly implement, workaround instead
-            //if (data.noFallFallDistance > 2.5) {
-            //    return REDUCED_HEIGHT;
-            //}
-        }*/
-        return FULL_BLOCK;
+            if (data.noFallFallDistance > 2.5) {
+                return REDUCED_HEIGHT;
+            } else if (data.lastY > y + 1 - 1e-5 && data.hasLeatherBoots && !pData.isShiftKeyPressed()) {
+                return FULL_HEIGHT;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public double[] getVisualShape(BlockCache blockCache, World world, int x, int y, int z) {
+        return FULL_HEIGHT;
+    }
+    
+    @Override
+    public boolean isCollisionSameVisual(BlockCache blockCache, World world, int x, int y, int z) {
+        return false;
     }
 
     @Override

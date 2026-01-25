@@ -14,10 +14,14 @@
  */
 package fr.neatmonster.nocheatplus.checks.moving.model;
 
+import org.bukkit.Input;
+import org.bukkit.entity.Player;
+
 import fr.neatmonster.nocheatplus.utilities.math.MathUtil;
 
 /**
  * Carry information regarding the player's key presses (WASD, space bar, shift, sprint).
+ * To not be conflated with the status of the player (isSprinting, isSneaking, etc).<br>
  */
 public class PlayerKeyboardInput implements Cloneable {
     
@@ -33,13 +37,13 @@ public class PlayerKeyboardInput implements Cloneable {
     private boolean isSpaceBarPressed; 
     /** The last space bar pressing */
     private boolean wasSpaceBarPressed;
-    /** The last sprinting status */
+    /** The last sprint toggle */
     private boolean wasSprintingKeyPressed;
-    /** The last shift status */
+    /** The last shift toggle */
     private boolean wasShiftPressed;
-    /** The shift key, usually represents sneaking */
+    /** The shift key toggle, usually represents sneaking */
     private boolean isShiftPressed;
-    /** The sprint key */
+    /** The sprint key toggle */
     private boolean isSprintingKeyPressed;
     /** Enum direction of the forward value */
     private ForwardDirection fdir;
@@ -61,6 +65,27 @@ public class PlayerKeyboardInput implements Cloneable {
     public PlayerKeyboardInput(float strafe, float forward) {
         this.strafe = strafe;
         this.forward = forward;
+        fdir = forward >= 0.0 ? forward == 0.0 ? ForwardDirection.NONE : ForwardDirection.FORWARD : ForwardDirection.BACKWARD;
+        sdir = strafe >= 0.0 ? strafe == 0.0 ? StrafeDirection.NONE : StrafeDirection.LEFT : StrafeDirection.RIGHT;
+    }
+
+    /**
+     * Sets the input state values in MovingData.
+     * 
+     * @param input The given input from {@link Player#getCurrentInput()}
+     */
+    public void set(Input input) {
+        lastStrafe = this.strafe;
+        lastForward = this.forward;
+        wasSprintingKeyPressed = this.isSprintingKeyPressed;
+        wasShiftPressed = this.isShiftPressed;
+        wasSpaceBarPressed = this.isSpaceBarPressed;
+        // do others store here
+        this.forward = Boolean.compare(input.isForward(), input.isBackward());
+        this.strafe = Boolean.compare(input.isLeft(), input.isRight());
+        this.isSpaceBarPressed = input.isJump();
+        this.isShiftPressed = input.isSneak();
+        this.isSprintingKeyPressed = input.isSprint();
         fdir = forward >= 0.0 ? forward == 0.0 ? ForwardDirection.NONE : ForwardDirection.FORWARD : ForwardDirection.BACKWARD;
         sdir = strafe >= 0.0 ? strafe == 0.0 ? StrafeDirection.NONE : StrafeDirection.LEFT : StrafeDirection.RIGHT;
     }

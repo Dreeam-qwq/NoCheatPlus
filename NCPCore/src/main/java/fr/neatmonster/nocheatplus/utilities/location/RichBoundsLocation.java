@@ -143,6 +143,9 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
     /** Is the player in powder snow? */
     Boolean inPowderSnow = null;
     
+    /** Is the player touched powder snow? */
+    Boolean touchedPowderSnow = null;
+    
     /** Is the player on a boncy block? (Bed, slime) */
     Boolean onBouncyBlock = null;
 
@@ -329,65 +332,6 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
      */
     public double getBoxMarginVertical() {
         return boxMarginVertical;
-    }
-
-    /**
-     * Compares block coordinates (not the world).
-     *
-     * @param other
-     *            the other
-     * @return true, if is same block
-     */
-    public final boolean isSameBlock(final IGetBlockPosition other) {
-        return blockX == other.getBlockX() && blockZ == other.getBlockZ() && blockY == other.getBlockY();
-    }
-
-    /**
-     * Block coordinate comparison.
-     *
-     * @param x
-     *            the x
-     * @param y
-     *            the y
-     * @param z
-     *            the z
-     * @return true, if is same block
-     */
-    public final boolean isSameBlock(final int x, final int y, final int z) {
-        return blockX == x && blockZ == z && blockY == y;
-    }
-
-    /**
-     * Compares block coordinates (not the world).
-     *
-     * @param loc
-     *            the loc
-     * @return true, if is same block
-     */
-    public final boolean isSameBlock(final Location loc) {
-        return blockX == loc.getBlockX() && blockZ == loc.getBlockZ() && blockY == loc.getBlockY();
-    }
-
-    /**
-     * Check if this location is above the given one (blockY + 1).
-     *
-     * @param loc
-     *            the loc
-     * @return true, if is block above
-     */
-    public boolean isBlockAbove(final IGetBlockPosition loc) {
-        return blockY == loc.getBlockY() + 1 && blockX == loc.getBlockX() && blockZ == loc.getBlockZ();
-    }
-
-    /**
-     * Check if this location is above the given one (blockY + 1).
-     *
-     * @param loc
-     *            the loc
-     * @return true, if is block above
-     */
-    public boolean isBlockAbove(final Location loc) {
-        return blockY == loc.getBlockY() + 1 && blockX == loc.getBlockX() && blockZ == loc.getBlockZ();
     }
 
     /**
@@ -606,6 +550,10 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
      */
     public boolean isInside(final long flags) {
         return BlockProperties.collides(blockCache, minX + 0.001, minY + 0.001, minZ + 0.001, maxX - 0.001, maxY - 0.001, maxZ - 0.001, flags);
+    }
+    
+    public boolean isInsideIgnoreBounds(final long flags) {
+        return BlockProperties.hasAnyFlags(blockCache, minX + 0.001, minY + 0.001, minZ + 0.001, maxX - 0.001, maxY - 0.001, maxZ - 0.001, flags);
     }
 
     /**
@@ -845,29 +793,20 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
                 inPowderSnow = false;
             }
             else {
-                inPowderSnow = false; // Must initialize with false.
-                final int iMinX = Location.locToBlock(minX + 0.001);
-                final int iMaxX = Location.locToBlock(maxX - 0.001);
-                final int iMinY = Location.locToBlock(minY + 0.001);
-                final int iMaxY = Math.min(Location.locToBlock(maxY - 0.001), blockCache.getMaxBlockY());
-                final int iMinZ = Location.locToBlock(minZ + 0.001);
-                final int iMaxZ = Location.locToBlock(maxZ - 0.001);
-                for (int x = iMinX; x < iMaxX; x++) {
-                    for (int y = iMinY; y < iMaxY; y++) {
-                        for (int z = iMinZ; z < iMaxZ; z++) {
-                            if (x == Math.floor(getX()) && y == Math.floor(getY()) && z == Math.floor(getZ())  // Ensure that we only check the exact block the player is currently inside.
-                                // Use collidesBlock to avoid having to check for a second collision loop within collides()
-                                // Do not check for flags as they already have been checked within isInPowderSnow
-                                && BlockProperties.collidesBlock(blockCache, minX, minY, minZ, maxX, maxY, maxZ, x, y, z, getOrCreateBlockCacheNode(), null, BlockFlags.F_POWDER_SNOW)) {
-                                inPowderSnow = true;
-                                return inPowderSnow;
-                            }
-                        }
-                    }
-                }
+                final long thisFlags = BlockFlags.getBlockFlags(getBlockType());
+                inPowderSnow = (thisFlags & BlockFlags.F_POWDER_SNOW) != 0;
             }
         }
         return inPowderSnow;
+    }
+    
+    public boolean touchedPowderSnow() {
+        if (touchedPowderSnow == null) {
+            if (blockFlags != null && (blockFlags & BlockFlags.F_POWDER_SNOW) == 0) {
+                touchedPowderSnow = false;
+            } else touchedPowderSnow = isInsideIgnoreBounds(BlockFlags.F_POWDER_SNOW);
+        }
+        return touchedPowderSnow;
     }
 
     /**
@@ -1574,6 +1513,7 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
         this.onBlueIce = other.isOnBlueIce();
         this.inSoulSand = other.isInSoulSand();
         this.inPowderSnow = other.isInPowderSnow();
+        this.touchedPowderSnow = other.touchedPowderSnow();
         this.onClimbable = other.isOnClimbable();
         this.onBouncyBlock = other.isOnBouncyBlock();
     }
@@ -1638,7 +1578,7 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
         // Reset cached values.
         node = nodeBelow = null;
         inLava = inWater = inWaterLogged = inWeb = onIce = onBlueIce = inSoulSand = onHoneyBlock 
-        = onSlimeBlock = inBerryBush = inPowderSnow = onGround = onClimbable = onBouncyBlock = passable 
+        = onSlimeBlock = inBerryBush = inPowderSnow = touchedPowderSnow = onGround = onClimbable = onBouncyBlock = passable 
         = passableBox = inBubbleStream = null;
         onGroundMinY = Double.MAX_VALUE;
         notOnGroundMaxY = Double.MIN_VALUE;

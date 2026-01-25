@@ -78,7 +78,31 @@ public class BlockCacheSpigotCB1_8_R3 extends BlockCache {
         block.updateShape(world, new BlockPosition(x, y, z));
 
         // minX, minY, minZ, maxX, maxY, maxZ
-        return new double[]{block.B(), block.D(), block.F(), block.C(),  block.E(),  block.G()};
+        return LegacyBlocks.adjustBounds(this, mat, x, y, z, new double[]{block.B(), block.D(), block.F(), block.C(), block.E(), block.G()});
+    }
+
+    @Override
+    public boolean isCollisionSameVisual(int x, int y, int z) {
+        final Material mat = getType(x, y, z);
+        return LegacyBlocks.isCollisionSameVisual(this, mat, x, y, z);
+    }
+
+    @Override
+    public double[] fetchVisualBounds(final int x, final int y, final int z){
+        final Material mat = getType(x, y, z);
+        @SuppressWarnings("deprecation")
+        final int id = mat.getId();
+        final net.minecraft.server.v1_8_R3.Block block = net.minecraft.server.v1_8_R3.Block.getById(id);
+        if (block == null) {
+            // TODO: Convention for null bounds -> full ?
+            return null;
+        }
+        final double[] shape = LegacyBlocks.getVisualShape(this, mat, x, y, z);
+        if (shape != null) return shape;
+        block.updateShape(world, new BlockPosition(x, y, z));
+
+        // minX, minY, minZ, maxX, maxY, maxZ
+        return LegacyBlocks.adjustBounds(this, mat, x, y, z, new double[]{block.B(), block.D(), block.F(), block.C(), block.E(), block.G()});
     }
 
     @Override

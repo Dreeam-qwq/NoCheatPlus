@@ -42,7 +42,6 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.util.Vector;
 
 import fr.neatmonster.nocheatplus.NCPAPIProvider;
 import fr.neatmonster.nocheatplus.checks.moving.MovingConfig;
@@ -75,6 +74,7 @@ import fr.neatmonster.nocheatplus.utilities.collision.supportingblock.Supporting
 import fr.neatmonster.nocheatplus.utilities.collision.tracing.axis.ICollidePassable;
 import fr.neatmonster.nocheatplus.utilities.collision.tracing.axis.PassableAxisTracing;
 import fr.neatmonster.nocheatplus.utilities.collision.tracing.ray.PassableRayTracing;
+import fr.neatmonster.nocheatplus.utilities.ds.map.BlockCoord;
 import fr.neatmonster.nocheatplus.utilities.entity.PotionUtil;
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
 import fr.neatmonster.nocheatplus.utilities.location.RichEntityLocation;
@@ -115,6 +115,8 @@ public class BlockProperties {
         PICKAXE,
         /** The hoe. */
         HOE,
+        /** The spear. */
+        SPEAR,
     }
 
     /**
@@ -129,14 +131,16 @@ public class BlockProperties {
         WOOD(1, 2f),
         /** The stone. */
         STONE(2, 4f),
+        /** The copper. */
+        COPPER(3, 5f),
         /** The iron. */
-        IRON(3, 6f),
+        IRON(4, 6f),
         /** The diamond. */
-        DIAMOND(4, 8f),
+        DIAMOND(5, 8f),
         /** The netherite */
-        NETHERITE(5, 9f),
+        NETHERITE(6, 9f),
         /** The gold. */
-        GOLD(6, 12f);
+        GOLD(7, 12f);
 
         /** Index for array. */
         public final int index;
@@ -572,9 +576,8 @@ public class BlockProperties {
         final Material blockBelow;
         // On 1.20, the block that is closest to the player position is considered, not the one on which the player is at the center.
         if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_20)) {
-            // TODO: is this correct?
-            Vector supportingBlock = SupportingBlockUtils.getOnPos(blockCache, eLoc.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
-            blockBelow = eLoc.getBlockType((int) supportingBlock.getX(), (int) supportingBlock.getY(), (int) supportingBlock.getZ());
+            BlockCoord supportingBlock = SupportingBlockUtils.getOnPos(blockCache, eLoc.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
+            blockBelow = eLoc.getBlockType(supportingBlock.getX(), supportingBlock.getY(), supportingBlock.getZ());
         }
         else blockBelow = eLoc.getBlockType(eLoc.getBlockX(), Location.locToBlock(eLoc.getY() - yBelow), eLoc.getBlockZ());
         //////////////////////////////////////////////////////////////
@@ -666,7 +669,7 @@ public class BlockProperties {
             stuckInFactor = 0.8D;
         }
         else if (eLoc.isInPowderSnow()) {
-            stuckInFactor = 0.8999999761581421D;
+            stuckInFactor = 0.9D;
         }
         blockCache.cleanup();
         eLoc.cleanup();
@@ -715,9 +718,8 @@ public class BlockProperties {
             final Material blockBelow2;
             // On 1.20, the block that is closest to the player position is considered, not the one on which the player is at the center.
             if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_20)) {
-                // TODO: is this correct?
-                Vector supportingBlock = SupportingBlockUtils.getOnPos(blockCache, eLoc.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
-                blockBelow2 = eLoc.getBlockType((int) supportingBlock.getX(), (int) supportingBlock.getY(), (int) supportingBlock.getZ());
+                BlockCoord supportingBlock = SupportingBlockUtils.getOnPos(blockCache, eLoc.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
+                blockBelow2 = eLoc.getBlockType(supportingBlock.getX(), supportingBlock.getY(), supportingBlock.getZ());
             }
             else blockBelow2 = eLoc.getBlockType(eLoc.getBlockX(), Location.locToBlock(eLoc.getY() - yBelow), eLoc.getBlockZ());
             if (blockBelow2 == Material.SOUL_SAND) {
@@ -1002,7 +1004,10 @@ public class BlockProperties {
         if (mat == null) {
             return false;
         }
-        if (MaterialUtil.SHULKER_BOXES.contains(mat) || mat == BridgeMaterial.BARREL) {
+        if (MaterialUtil.SHULKER_BOXES.contains(mat) 
+            || mat == BridgeMaterial.BARREL 
+            || MaterialUtil.COPPER_CHESTS.contains(mat)
+            || MaterialUtil.WOODEN_SHELVES.contains(mat)) {
             return true;
         }
         // Must be one of the following material:
@@ -1410,6 +1415,14 @@ public class BlockProperties {
         tools.put(Material.STONE_AXE, new ToolProps(ToolType.AXE, MaterialBase.STONE));
         tools.put(Material.STONE_HOE, new ToolProps(ToolType.HOE, MaterialBase.STONE));
 
+        if (BridgeMaterial.COPPER_SWORD != null) {
+            tools.put(BridgeMaterial.COPPER_SWORD, new ToolProps(ToolType.SWORD, MaterialBase.COPPER));
+            tools.put(BridgeMaterial.COPPER_SHOVEL, new ToolProps(ToolType.SPADE, MaterialBase.COPPER));
+            tools.put(BridgeMaterial.COPPER_PICKAXE, new ToolProps(ToolType.PICKAXE, MaterialBase.COPPER));
+            tools.put(BridgeMaterial.COPPER_AXE, new ToolProps(ToolType.AXE, MaterialBase.COPPER));
+            tools.put(BridgeMaterial.COPPER_HOE, new ToolProps(ToolType.HOE, MaterialBase.COPPER));
+        }
+
         tools.put(Material.IRON_SWORD, new ToolProps(ToolType.SWORD, MaterialBase.IRON));
         tools.put(BridgeMaterial.IRON_SHOVEL, new ToolProps(ToolType.SPADE, MaterialBase.IRON));
         tools.put(Material.IRON_PICKAXE, new ToolProps(ToolType.PICKAXE, MaterialBase.IRON));
@@ -1434,6 +1447,16 @@ public class BlockProperties {
             tools.put(BridgeMaterial.NETHERITE_PICKAXE, new ToolProps(ToolType.PICKAXE, MaterialBase.NETHERITE));
             tools.put(BridgeMaterial.NETHERITE_AXE, new ToolProps(ToolType.AXE, MaterialBase.NETHERITE));
             tools.put(BridgeMaterial.NETHERITE_HOE, new ToolProps(ToolType.HOE, MaterialBase.NETHERITE));
+        }
+        
+        if (BridgeMaterial.DIAMOND_SPEAR != null) {
+            tools.put(BridgeMaterial.DIAMOND_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.DIAMOND));
+            tools.put(BridgeMaterial.NETHERITE_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.NETHERITE));
+            tools.put(BridgeMaterial.IRON_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.IRON));
+            tools.put(BridgeMaterial.STONE_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.STONE));
+            tools.put(BridgeMaterial.WOODEN_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.WOOD));
+            tools.put(BridgeMaterial.GOLDEN_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.GOLD));
+            tools.put(BridgeMaterial.COPPER_SPEAR, new ToolProps(ToolType.SPEAR, MaterialBase.COPPER));
         }
 
         tools.put(Material.SHEARS, new ToolProps(ToolType.SHEARS, MaterialBase.NONE));
@@ -1568,7 +1591,9 @@ public class BlockProperties {
 
         // 1.5 high blocks (fences, walls, gates)
         final long flags150 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE | BlockFlags.F_THICK_FENCE;
-        for (final Material mat : new Material[]{BridgeMaterial.NETHER_BRICK_FENCE, BridgeMaterial.COBBLESTONE_WALL,}) {
+        final long flags1502 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE | BlockFlags.F_WALL;
+        BlockFlags.setFlag(BridgeMaterial.COBBLESTONE_WALL, flags1502);
+        for (final Material mat : new Material[]{BridgeMaterial.NETHER_BRICK_FENCE}) {
             BlockFlags.setFlag(mat, flags150);
         }
         for (final Material mat : MaterialUtil.WOODEN_FENCES) {
@@ -2559,6 +2584,7 @@ public class BlockProperties {
                 case GOLD:
                 case IRON:
                 case NETHERITE:
+                case COPPER:
                 case STONE:
                 case WOOD:
                     return isValidTool;
@@ -2568,6 +2594,7 @@ public class BlockProperties {
         }
         if (blockMat == MaterialBase.STONE) {
             switch (toolMat) {
+                case COPPER:
                 case DIAMOND:
                 case IRON:
                 case NETHERITE:
@@ -2579,6 +2606,7 @@ public class BlockProperties {
         }
         if (blockMat == MaterialBase.IRON) {
             switch (toolMat) {
+                case COPPER:
                 case DIAMOND:
                 case IRON:
                 case NETHERITE:
@@ -3249,37 +3277,36 @@ public class BlockProperties {
         if ((flags & BlockFlags.F_POWDER_SNOW) != 0) {
             return true;
         } 
-        else if ((flags & BlockFlags.F_PASSABLE_X4) != 0 && (access.getData(bx, by, bz) & 0x4) != 0) {
+        //else if ((flags & BlockFlags.F_PASSABLE_X4) != 0 && (access.getData(bx, by, bz) & 0x4) != 0) {
             // (Allow checking further entries.)
-            return true; 
-        }
-        else if ((flags & BlockFlags.F_THICK_FENCE) != 0) {
-            if (!collidesFence(fx, fz, dX, dZ, dT, 0.125)) {
-                return true;
-            }
-        }
-        else if ((flags & BlockFlags.F_THIN_FENCE) != 0) {
-            if (!collidesFence(fx, fz, dX, dZ, dT, 0.0625)) {
-                return true;
-            }
+        //    return true; 
+        //}
+        //else if ((flags & BlockFlags.F_THICK_FENCE) != 0) {
+        //    if (!collidesFence(fx, fz, dX, dZ, dT, 0.125)) {
+        //        return true;
+        //    }
+        //}
+        //else if ((flags & BlockFlags.F_THIN_FENCE) != 0) {
+        //    if (!collidesFence(fx, fz, dX, dZ, dT, 0.0625)) {
+        //        return true;
+        //    }
             // NOTE: 0.974 depends on Y_ON_GROUND_DEFAULT
-            return Math.min(fy, fy + dY * dT) < 0.974 && !collidesBlock(access, minX, minY, minZ, maxX, maxY, maxZ, bx, by, bz, node, null, flags | BlockFlags.F_FAKEBOUNDS);
-        }
-        else if (id == Material.CAULDRON || id == Material.HOPPER) {
-            if (Math.min(fy, fy + dY * dT) >= getGroundMinHeight(access, bx, by, bz, node, flags)) {
+        //    return Math.min(fy, fy + dY * dT) < 0.974 && !collidesBlock(access, minX, minY, minZ, maxX, maxY, maxZ, bx, by, bz, node, null, flags | BlockFlags.F_FAKEBOUNDS);
+        //}
+        //else if (id == Material.CAULDRON || id == Material.HOPPER) {
+        //    if (Math.min(fy, fy + dY * dT) >= getGroundMinHeight(access, bx, by, bz, node, flags)) {
                 // Check for moving through walls or floor.
                 // TODO: Maybe this is too exact...
-                return isInsideCenter(fx, fz, dX, dZ, dT, 0.125);
-            }
-        }
+        //        return isInsideCenter(fx, fz, dX, dZ, dT, 0.125);
+        //    }
+        //}
         else if ((flags & BlockFlags.F_GROUND_HEIGHT) != 0
                 && getGroundMinHeight(access, bx, by, bz, node, flags) <= Math.min(fy, fy + dY * dT)) {
             return true;
         } 
-        // TODO: Review. Is this still needed?
-        else if (id.toString().equals("CHORUS_PLANT") && !collidesFence(fx, fz, dX, dZ, dT, 0.3)) {
-             return true;
-        }
+        //else if (id.toString().equals("CHORUS_PLANT") && !collidesFence(fx, fz, dX, dZ, dT, 0.3)) {
+        //     return true;
+        //}
         // Nothing found.
         return false;
     }
@@ -4183,44 +4210,149 @@ public class BlockProperties {
         ////////////////////////////
         // Special cases...       //
         ////////////////////////////
-        // TODO: Deprecate and use a client-specific workaround now that we support client versions.
         // Fake the blockBounds of thin glass
         // (Bugged blocks bounds around 1.8. Mojang...)
-        if ((flags & BlockFlags.F_FAKEBOUNDS) != 0) {
+        //if ((flags & BlockFlags.F_FAKEBOUNDS) != 0) {
             // Length / Margin of the blockBounds along the X axis
-            final double aaBBLengthZ = bMaxZ - bMinZ;
+        //    final double aaBBLengthZ = bMaxZ - bMinZ;
             // Length / Margin of the blockBounds along the Z axis
-            final double aaBBLengthX = bMaxX - bMinX;
-            if (aaBBLengthZ == 0.125 && aaBBLengthX != 1.0) {
-                if (bMinX == 0.0) {
-                    bMaxX = 0.5;
-                }
-                if (bMaxX == 1.0) {
-                    bMinX = 0.5;
-                }
-            } 
-            else if (aaBBLengthX == 0.125 && aaBBLengthZ != 1.0) {
-                if (bMinZ == 0.0) {
-                    bMaxZ = 0.5;
-                }
-                if (bMaxZ == 1.0) {
-                    bMinZ = 0.5;
-                }
-            } 
-            else if (aaBBLengthX == aaBBLengthZ && aaBBLengthX != 1.0) {
-                if (bMaxX == 0.5625) {
-                    bMaxX = 0.5;
-                }
-                else if (bMaxZ == 0.5625) {
-                    bMaxZ = 0.5;
-                }
-                else if (bMinX == 0.4375) {
-                    bMinX = 0.5;
-                }
-                else if (bMinZ == 0.4375) {
-                    bMinZ = 0.5;
-                }
-            }
+        //    final double aaBBLengthX = bMaxX - bMinX;
+        //    if (aaBBLengthZ == 0.125 && aaBBLengthX != 1.0) {
+        //        if (bMinX == 0.0) {
+        //            bMaxX = 0.5;
+        //        }
+        //        if (bMaxX == 1.0) {
+        //            bMinX = 0.5;
+        //        }
+        //    } 
+        //    else if (aaBBLengthX == 0.125 && aaBBLengthZ != 1.0) {
+        //        if (bMinZ == 0.0) {
+        //            bMaxZ = 0.5;
+        //        }
+        //        if (bMaxZ == 1.0) {
+        //            bMinZ = 0.5;
+        //        }
+        //    } 
+        //    else if (aaBBLengthX == aaBBLengthZ && aaBBLengthX != 1.0) {
+        //        if (bMaxX == 0.5625) {
+        //            bMaxX = 0.5;
+        //        }
+        //        else if (bMaxZ == 0.5625) {
+        //            bMaxZ = 0.5;
+        //        }
+        //        else if (bMinX == 0.4375) {
+        //            bMinX = 0.5;
+        //        }
+        //        else if (bMinZ == 0.4375) {
+        //            bMinZ = 0.5;
+        //        }
+        //    }
+        //}
+        
+        //////////////////////////////////
+        // Check for collision          //
+        //////////////////////////////////
+        final boolean allowEdge = (flags & BlockFlags.F_COLLIDE_EDGES) == 0;
+        // Still keep this primary bounds check stand alone with loop below for flags compatibility
+        if (AxisAlignedBBUtils.isCollided(new double[]{bMinX, bMinY, bMinZ, bMaxX, bMaxY, bMaxZ}, x, y, z, new double[]{minX, minY, minZ, maxX, maxY, maxZ}, allowEdge)) {
+            return true;
+        }
+        // Check for multi-bounding-box double arrays (starting from the 2nd box in the array. 1st has already been checked above).
+        return !AxisAlignedBBUtils.isSimpleShape(blockBounds) && AxisAlignedBBUtils.isCollided(blockBounds, x, y, z, new double[]{minX, minY, minZ, maxX, maxY, maxZ}, allowEdge, 2);
+    }
+    
+    /**
+     * Check if the given bounds collide with the block for the given type id at the
+     * given position. This does not check workarounds for ground_height nor
+     * passable.
+     *
+     * @param access
+     *            the access <- we all love the access!
+     * @param minX
+     *            the min x
+     *            Player's AABB coordinates...
+     * @param minY
+     *            the min y
+     * @param minZ
+     *            the min z
+     * @param maxX
+     *            the max x
+     * @param maxY
+     *            the max y
+     * @param maxZ
+     *            the max z
+     * @param x
+     *            the x
+     * @param y
+     *            the y
+     * @param z
+     *            the z
+     * @param node
+     *            The node at the given block coordinates (not null, bounds need
+     *            not be fetched).
+     * @param nodeAbove
+     *            The node above the given block coordinates (may be null). Pass
+     *            for efficiency, if it should already have been fetched for
+     *            some reason.
+     * @param flags
+     *            Block flags for the block at x, y, z. Mix in BlockFlags.F_COLLIDE_EDGES
+     *            to disallow the "high edges" of blocks (for which this method will return false then).
+     * @return true, if successful
+     */
+    public static final boolean collidesBlockVisually(final BlockCache access, final double minX, double minY, final double minZ, 
+                                              final double maxX, final double maxY, final double maxZ, 
+                                              final int x, final int y, final int z, 
+                                              final IBlockCacheNode node, final IBlockCacheNode nodeAbove, 
+                                              final long flags) {
+        // Get the block's blockBounds (shape)
+        // Bounds are stored in order of minXYZ... maxXYZ
+        final double[] blockBounds = node.getVisualBounds(access, x, y, z);
+        if (blockBounds == null) {
+            // Somehow null, early return.
+            return false;
+        }
+        
+        /* Coordinates of the first axis aligned bounding box in the array */
+        double bMinX, bMinZ, bMinY, bMaxX, bMaxY, bMaxZ;
+        //////////////////////////////////////////////////////////////////
+        // Fill in the horizontal bounds (minX, maxX, minZ, maxZ)...    //
+        //////////////////////////////////////////////////////////////////
+        if ((flags & BlockFlags.F_XZ100) != 0) {
+            bMinX = bMinZ = 0;
+            bMaxX = bMaxZ = 1;
+        }
+        else {
+            // Auto-fill, if the block does not have full horizontal bounds.
+            bMinX = blockBounds[0]; 
+            bMinZ = blockBounds[2];
+            bMaxX = blockBounds[3]; 
+            bMaxZ = blockBounds[5]; 
+        }
+        
+        //////////////////////////////////////////////////////////
+        // Fill in the vertical bounds (minY, maxY)...          //
+        //////////////////////////////////////////////////////////
+        if ((flags & BlockFlags.F_HEIGHT_8_INC) != 0) {
+            bMinY = 0;
+            final int data = (node.getData(access, x, y, z) & 0xF) % 8;
+            bMaxY = 0.125 * data;
+        }
+        else if ((flags & BlockFlags.F_HEIGHT150) != 0) {
+            bMinY = 0;
+            // TODO: Should fill all sub bounding box not only primary
+            bMaxY = 1.0;
+        }
+        else if ((flags & BlockFlags.F_HEIGHT100) != 0) {
+            bMinY = 0;
+            bMaxY = 1.0;
+        }
+        else if ((flags & BlockFlags.F_HEIGHT_8SIM_DEC) != 0) {
+            return false;
+        }
+        else {
+            // Auto-fill.
+            bMinY = blockBounds[1]; // minY
+            bMaxY = blockBounds[4]; // maxY
         }
         
         //////////////////////////////////
@@ -4422,6 +4554,15 @@ public class BlockProperties {
             // The block does not have the ground flag.
             return AlmostBoolean.MAYBE;
         }
+        final IPlayerData pData = access.getPlayerData();
+        if (pData != null) {
+            boolean hasBoots = pData.getGenericInstance(MovingData.class).hasLeatherBoots;
+            if ((flags & BlockFlags.F_POWDER_SNOW) != 0) {
+                // Player is in/on powder snow.
+                final double result = maxY - y - 1.0;
+                return hasBoots && result >= 0 && result < 0.001 ? AlmostBoolean.YES : AlmostBoolean.MAYBE;
+            }
+        }
         final double[] blockAABB = node.getBounds(access, x, y, z);
         if (blockAABB == null) {
             // Ground flag has been collected, but the block's bounds are null.
@@ -4440,14 +4581,6 @@ public class BlockProperties {
         ////////////////////////////////////////////////////////////////////
         // Judge if the block collision can be considered as "ground"     //
         ////////////////////////////////////////////////////////////////////
-        final IPlayerData pData = access.getPlayerData();
-        if (pData != null) {
-            boolean hasBoots = pData.getGenericInstance(MovingData.class).hasLeatherBoots;
-            if ((flags & BlockFlags.F_POWDER_SNOW) != 0) {
-                // Player is in/on powder snow.
-                return hasBoots && (maxY - y >= 1.0) ? AlmostBoolean.YES : AlmostBoolean.NO;
-            }
-        }
         // Check if the collided block can be passed through with the bounding box (wall-climbing. Disregard the ignore flag).
         if (isPassableWorkaround(access, x, y, z, minX - x, minY - y, minZ - z, node, maxX - minX, maxY - minY, maxZ - minZ, minX, minY, minZ, maxX, maxY, maxZ, 1.0)) {
             if ((flags & BlockFlags.F_GROUND_HEIGHT) == 0 || getGroundMinHeight(access, x, y, z, node, flags) > maxY - y) { // TODO: height >= ?
@@ -4777,6 +4910,59 @@ public class BlockProperties {
                                                  minX, minY, minZ, maxX, maxY, maxZ, 1.0)) {
             return true;
         }
+        // Does collide (most likely).
+        return false;
+    }
+    
+    /**
+     * Check passability with an arbitrary bounding box vs. a block.
+     *
+     * @param access
+     *            the access
+     * @param blockX
+     *            the block x
+     * @param blockY
+     *            the block y
+     * @param blockZ
+     *            the block z
+     * @param minX
+     *            the min x
+     * @param minY
+     *            the min y
+     * @param minZ
+     *            the min z
+     * @param maxX
+     *            the max x
+     * @param maxY
+     *            the max y
+     * @param maxZ
+     *            the max z
+     * @return true, if is passable box
+     */
+    public static final boolean isPassableVisualBox(final BlockCache access, 
+                                              final int blockX, final int blockY, final int blockZ,
+                                              final double minX, final double minY, final double minZ,
+                                              final double maxX, final double maxY, final double maxZ) {
+        // TODO: This mostly is copy and paste from isPassableBox.
+        final IBlockCacheNode node = access.getOrCreateBlockCacheNode(blockX, blockY, blockZ, false);
+        final Material id = node.getType();
+        if (BlockProperties.isPassable(id)) {
+            return true;
+        }
+        double[] bounds = access.getVisualBounds(blockX, blockY, blockZ);
+        if (bounds == null) {
+            return true;
+        }
+        // (Coordinates are already passed in an ordered form.)
+        if (!collidesBlockVisually(access, minX, minY, minZ, maxX, maxY, maxZ, blockX, blockY, blockZ, node, null, BlockFlags.getBlockFlags(id) | BlockFlags.F_COLLIDE_EDGES)) {
+            return true;
+        }
+
+        // Check for workarounds.
+        //if (BlockProperties.isPassableWorkaround(access, blockX, blockY, blockZ, minX - blockX, minY - blockY, minZ - blockZ, node, maxX - minX, maxY - minY, maxZ - minZ, 
+        //                                         minX, minY, minZ, maxX, maxY, maxZ, 1.0)) {
+        //    return true;
+        //}
         // Does collide (most likely).
         return false;
     }

@@ -65,12 +65,13 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
         0.25, 0.125, 0.25, 0.75, 0.875, 0.75
     );
     private static final BukkitShapeModel MODEL_HOPPER = new BukkitHopper();
-    private static final BukkitShapeModel MODEL_CAULDRON = new BukkitCauldron(0.1875, 0.125, 0.8125, 0.0625);
-    private static final BukkitShapeModel MODEL_COMPOSTER = new BukkitCauldron(0.0, 0.125, 1.0, 0.125);
+    private static final BukkitShapeModel MODEL_CAULDRON = new BukkitCauldron();
+    private static final BukkitShapeModel MODEL_COMPOSTER = new BukkitComposter(0.0, 0.125, 1.0, 0.125);
     private static final BukkitShapeModel MODEL_PISTON_HEAD = new BukkitPistonHead();
     private static final BukkitShapeModel MODEL_BELL = new BukkitBell();
     private static final BukkitShapeModel MODEL_ANVIL = new BukkitAnvil();
     private static final BukkitShapeModel MODEL_GRIND_STONE = new BukkitGrindStone();
+    private static final BukkitShapeModel MODEL_SHELF = new BukkitWoodenShelf();
 
     // Blocks that change shape based on interaction or redstone.
     private static final BukkitShapeModel MODEL_DOOR = new BukkitDoor();
@@ -99,8 +100,8 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
     private static final BukkitShapeModel MODEL_END_ROD = new BukkitDirectionalCentered(0.375, 1.0, false);
 
     // Blocks that have a different shape with neighbor blocks (bukkit takes care though).
-    private static final BukkitShapeModel MODEL_THIN_FENCE = new BukkitFence(0.4375, 1.0);
-    private static final BukkitShapeModel MODEL_THICK_FENCE = new BukkitFence(0.375, 1.5);
+    private static final BukkitShapeModel MODEL_THIN_FENCE = new BukkitFence(0.4375, 1.0, true);
+    private static final BukkitShapeModel MODEL_THICK_FENCE = new BukkitFence(0.375, 1.5, false);
     private static final BukkitShapeModel MODEL_THICK_FENCE2 = new BukkitWall(0.25, 1.5, 0.3125); // .75 .25 0 max: .25 .75 .5
     private static final BukkitShapeModel MODEL_WALL_HEAD = new BukkitWallHead();
 
@@ -228,9 +229,29 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
             addModel(mat, MODEL_AUTO_FETCH);
         }
 
+        // Stonecutter and legacy chains
         for (Material mat : BridgeMaterial.getAllBlocks(
             "stonecutter", "chain")) {
             addModel(mat, MODEL_AUTO_FETCH_LEGACY);
+        }
+        
+        // Modern iron chains
+        if (BridgeMaterial.IRON_CHAIN != null) {
+            addModel(BridgeMaterial.IRON_CHAIN, MODEL_AUTO_FETCH);
+        }
+        
+        // Copper chains
+        for (Material mat : MaterialUtil.COPPER_CHAINS) {
+            addModel(mat, MODEL_AUTO_FETCH_LEGACY);
+        }
+        
+        // Copper golem statues.
+        for (Material mat : MaterialUtil.COPPER_GOLEM_STATUES) {
+            addModel(mat, MODEL_AUTO_FETCH);
+        }
+        
+        for (Material mat : MaterialUtil.WOODEN_SHELVES) {
+            addModel(mat, MODEL_SHELF);
         }
 
         // Camp fire
@@ -263,7 +284,8 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
         addModel(BridgeMaterial.CAKE, MODEL_CAKE);
 
         // End Rod / Lightning Rod.
-        for (Material mat : MaterialUtil.RODS) {
+        // TODO: Do they actually have the same model? Doesn't the lightning rod have a slightly different box/bulb at the top?
+        for (Material mat : MaterialUtil.END_RODS) {
             addModel(mat, MODEL_END_ROD);
         }
 
@@ -317,10 +339,13 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
             addModel(mat, MODEL_XZ100_HEIGHT16_15);
         }
 
-        // Thin fence: Glass panes, iron bars.
+        // Thin fence: Glass panes, iron bars, copper bars.
         for (final Material mat : MaterialUtil.addBlocks(
             MaterialUtil.GLASS_PANES, 
             BridgeMaterial.IRON_BARS)) {
+            addModel(mat, MODEL_THIN_FENCE);
+        }
+        for (final Material mat : MaterialUtil.COPPER_BARS) {
             addModel(mat, MODEL_THIN_FENCE);
         }
 
@@ -338,6 +363,9 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
         // TOOD: Might add a facing/directional extension for double chests.
         for (Material mat : BridgeMaterial.getAllBlocks(
             "chest", "trapped_chest", "ender_chest")) {
+            addModel(mat, MODEL_SINGLE_CHEST);
+        }
+        for (Material mat : MaterialUtil.COPPER_CHESTS) {
             addModel(mat, MODEL_SINGLE_CHEST);
         }
 
@@ -409,6 +437,9 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
         // Lantern.
         for (Material mat : BridgeMaterial.getAllBlocks(
             "lantern", "soul_lantern")) {
+            addModel(mat, MODEL_LANTERN);
+        }
+        for (Material mat : MaterialUtil.COPPER_LANTERNS) {
             addModel(mat, MODEL_LANTERN);
         }
 

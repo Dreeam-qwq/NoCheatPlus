@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.bukkit.Location;
-import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -33,7 +32,7 @@ import com.comphenix.protocol.reflect.StructureModifier;
 
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.net.NetConfig;
-import fr.neatmonster.nocheatplus.compat.bukkit.BridgeBukkitAPI;
+import fr.neatmonster.nocheatplus.compat.registry.BukkitAPIAccessFactory;
 import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.players.DataManager;
 import fr.neatmonster.nocheatplus.players.IPlayerData;
@@ -46,9 +45,9 @@ public class SoundDistance extends BaseAdapter {
 
     /** Partly by debugging, partly from various sources, possibly including wrong spelling. */
     private static final Set<String> effectNames = new HashSet<String>(Arrays.asList(
-            ////////////
-            // PRE 1.9
-            ////////////
+            /////////////
+            // PRE 1.9 //
+            /////////////
 
             // Weather
             "ambient.weather.thunder",
@@ -69,7 +68,7 @@ public class SoundDistance extends BaseAdapter {
             "game.neutral.die", // Enderdragon 1.8.7 (debug).
 
             //////////////////
-            // 1.9 AND LATER
+            // 1.9 AND 1.20 //
             //////////////////
             // Weather
             "ENTITY_LIGHTNING_IMPACT",
@@ -88,9 +87,22 @@ public class SoundDistance extends BaseAdapter {
             "ENTITY_WITHER_DEATH",
             "ENTITY_WITHER_HURT",
             "ENTITY_WITHER_SHOOT",
-            "ENTITY_WITHER_SPAWN"
+            "ENTITY_WITHER_SPAWN",
 
-
+            ////////////////////
+            // 1.21 AND LATER //
+            ////////////////////
+            // Weather
+            "ENTITY_LIGHTNING_BOLT_IMPACT",
+            "ENTITY_LIGHTNING_BOLT_THUNDER",
+            // Enderdragon
+            "ENTITY_ENDER_DRAGON_AMBIENT",
+            "ENTITY_ENDER_DRAGON_DEATH",
+            "ENTITY_DRAGON_FIREBALL_EXPLODE",
+            "ENTITY_ENDER_DRAGON_FLAP",
+            "ENTITY_ENDER_DRAGON_GROWL",
+            "ENTITY_ENDER_DRAGON_HURT",
+            "ENTITY_ENDER_DRAGON_SHOOT"
             ));
 
     private final Integer idSoundEffectCancel = counters.registerKey("packet.sound.cancel");
@@ -122,16 +134,7 @@ public class SoundDistance extends BaseAdapter {
     }
 
     private boolean isSoundMonitoredLatest(final PacketContainer packetContainer) {
-        StructureModifier<Sound> sounds = packetContainer.getSoundEffects();
-        // Compatibility: Can't use sounds#getValues() for 1.12 server using 1.21 build. Something changed internally in org.bukkit.Sound
-        for (int i = 0; i < sounds.size(); i++) {
-            final Sound sound = sounds.readSafely(i);
-            if (sound != null && effectNames.contains(BridgeBukkitAPI.ConvertSoundToString(sound))) {
-                //debug(null, "MONITOR SOUND: " + sound);
-                return true;
-            }
-        }
-        return false;
+        return BukkitAPIAccessFactory.getBukkitAccess().matchSounds(packetContainer, effectNames);
     }
 
     private boolean isSoundMonitored(final PacketContainer packetContainer) {

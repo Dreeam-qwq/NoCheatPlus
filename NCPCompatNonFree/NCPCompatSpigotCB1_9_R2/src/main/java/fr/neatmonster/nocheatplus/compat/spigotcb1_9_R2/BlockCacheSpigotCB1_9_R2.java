@@ -85,7 +85,37 @@ public class BlockCacheSpigotCB1_9_R2 extends BlockCache {
             //return null;
         }
         // minX, minY, minZ, maxX, maxY, maxZ
-        return new double[]{bb.a, bb.b, bb.c, bb.d,  bb.e, bb.f};
+        return LegacyBlocks.adjustBounds(this, mat, x, y, z, new double[]{bb.a, bb.b, bb.c, bb.d, bb.e, bb.f});
+    }
+
+    @Override
+    public boolean isCollisionSameVisual(int x, int y, int z) {
+        final Material mat = getType(x, y, z);
+        return LegacyBlocks.isCollisionSameVisual(this, mat, x, y, z);
+    }
+
+    @Override
+    public double[] fetchVisualBounds(final int x, final int y, final int z){
+        final Material mat = getType(x, y, z);
+        @SuppressWarnings("deprecation")
+        final int id = mat.getId();	
+        final net.minecraft.server.v1_9_R2.Block block = net.minecraft.server.v1_9_R2.Block.getById(id);
+        if (block == null) {
+            // TODO: Convention for null blocks -> full ?
+            return null;
+        }
+        final double[] shape = LegacyBlocks.getVisualShape(this, mat, x, y, z);
+        if (shape != null) return shape;
+        final BlockPosition pos = new BlockPosition(x, y, z);
+        // TODO: Deprecation warning below (reason / substitute?).
+        @SuppressWarnings("deprecation")
+        final AxisAlignedBB bb = block.a(world.getType(pos), world, pos);
+        if (bb == null) {
+            return new double[] {0.0, 0.0, 0.0, 1.0, 1.0, 1.0}; // Special case.
+            //return null;
+        }
+        // minX, minY, minZ, maxX, maxY, maxZ
+        return LegacyBlocks.adjustBounds(this, mat, x, y, z, new double[]{bb.a, bb.b, bb.c, bb.d, bb.e, bb.f});
     }
 
     @Override

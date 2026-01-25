@@ -106,7 +106,7 @@ public class MagicWorkarounds {
                /*
                 * 0: Don't predict if the movement has messed up coordinates.
                 */
-                !isNormalOrPacketSplitMove && thisMove.yDistance >= 0.0
+                !isNormalOrPacketSplitMove && thisMove.yDistance > 0.0
                 && data.ws.use(WRPT.W_M_SF_INACCURATE_SPLIT_MOVE)
                /*
                 * 0: Players can still press the space bar in powder snow to boost ascending speed.
@@ -133,13 +133,13 @@ public class MagicWorkarounds {
                 * Nothing much to add here, this will effectively let players move freely. The Extreme subcheck will however ensure that players cannot perform insane moves.
                 * Why would we have to also keep up with Mojang's negligence? Playing cat-and-mice with cheaters is more than enough. 
                 */
-                || Bridge1_9.getLevitationAmplifier(player) >= 127
+                || Bridge1_9.getLevitationAmplifier(player) >= 127 && !Double.isInfinite(Bridge1_9.getLevitationAmplifier(player)) // Must check that the potion is still active here.
                 && data.ws.use(WRPT.W_M_SF_SBYTE_OVERFLOW)
                /*
                 * 0: Let older clients on newer servers ascend with protocol-hack plugins emulating levitation.
                 * Not going to put up with server administrators who want compatibility AND ACCURACY/CHEAT PROTECTION for every client under the rainbow (including 10+ year old ones)
                 */
-                || pData.getClientVersion().isLowerThan(ClientVersion.V_1_9) && thisMove.yDistance > 0.0 && ServerVersion.isAtLeast("1.9")
+                || pData.getClientVersion().isLowerThan(ClientVersion.V_1_9) && thisMove.yDistance > 0.0 && ServerVersion.isAtLeast("1.9") && !Double.isInfinite(Bridge1_9.getLevitationAmplifier(player))
                 && data.ws.use(WRPT.W_M_SF_LEVITATION_1_8_CLIENT)
             ;
     }
@@ -211,21 +211,21 @@ public class MagicWorkarounds {
                 * TODO: This needs to be handled in a more decent way in RichEntityLocation. Will be removed.
                 * TODO: Does this actually work?
                 */
-                || player.getFallDistance() > 2.5 && thisMove.from.inPowderSnow && !lastMove.from.inPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
-                && data.ws.use(WRPT.W_M_SF_LANDING_ON_PWDSNW_FALLDIST_25)
+                //|| player.getFallDistance() > 2.5 && thisMove.from.inPowderSnow && !lastMove.from.inPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
+                //&& data.ws.use(WRPT.W_M_SF_LANDING_ON_PWDSNW_FALLDIST_25)
                /*
                 * 0: Allow the subsequent move of the one above as well, as it will still yield a false positive.
-                * TODO: This needs to be handled in a more decent way in RichEntityLocation. Will be removed.
-                * TODO: Does this actually work?
+                * TODO: This can be fixed by reset ydist to 0 instead copy last(resetcond/flip toIsValid?). Still not sure how to do without uglier the code. Will be removed.
+                * TODO: In or touched?
                 */
-                || thisMove.to.inPowderSnow && !secondLastMove.from.inPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
+                || thisMove.to.touchedPowderSnow && !secondLastMove.from.touchedPowderSnow && thisMove.yDistance < 0.0 && lastMove.yDistance < 0.0
                 && data.ws.use(WRPT.W_M_SF_LANDING_ON_PWDSNW_FALLDIST_25)
                 /*
                  * 0: With players breaking blocks beneath them.
                  * When a player breaks a block below them, several 0-yDistance moves will be sent to the server, while being off the ground (seemingly hovering above the just broken block) 
                  * After these moves, the player speeds down to the ground, landing on it.
-                 * With sfHoverTicks with multiMoveCount covered they near ground and all moves no more than Bukkit's min movement threshold
-                 * The client sent data to server but not firing PlayerMoveEvent because of the min movement threshold and stack till next PME
+                 * The client actually sent movement data to the server, but no PlayerMoveEvent is triggered due to the usual thresholds, causing the movements to stack until the next event.
+                 * With sfHoverTicks and multiMoveCount accounted for, this should be exploit-free: the player remains near the ground and all movements stay within Bukkit’s minimum movement threshold.
                  */
                 || thisMove.yDistance == 0.0 && data.sfHoverTicks <= 1
                 && thisMove.multiMoveCount > 0 && thisMove.multiMoveCount <= 17 && PhysicsEnvelope.inAir(thisMove)

@@ -23,6 +23,7 @@ import org.bukkit.entity.Pose;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -30,6 +31,7 @@ import org.bukkit.event.entity.EntityPoseChangeEvent;
 import org.bukkit.event.entity.EntityToggleGlideEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerRiptideEvent;
@@ -47,6 +49,7 @@ import fr.neatmonster.nocheatplus.checks.moving.MovingData;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveInfo;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.VelocityFlags;
+import fr.neatmonster.nocheatplus.compat.AlmostBoolean;
 import fr.neatmonster.nocheatplus.compat.Bridge1_13;
 import fr.neatmonster.nocheatplus.compat.Bridge1_9;
 import fr.neatmonster.nocheatplus.compat.BridgeMisc;
@@ -137,13 +140,6 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
                 }
             });
         }
-        if (BridgeMisc.hasPlayerInputEvent()) {
-            /**
-             * See {@link PlayerMoveData#input} as for why we listen to this event.
-             * @param event the input event
-             */
-            queuedComponents.add(new InputChangeListener());
-        }
         if (Bridge1_13.hasPlayerRiptideEvent()) {
             queuedComponents.add(new Listener() {
                 @EventHandler(priority = EventPriority.MONITOR)
@@ -178,8 +174,7 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
     public void onReleasingTrident(Player player, Vector vel) {
         final IPlayerData pData = DataManager.getPlayerData(player);
         final MovingData data = pData.getGenericInstance(MovingData.class);
-        final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
-        thisMove.tridentRelease = true;
+        data.setTridentReleaseEvent(AlmostBoolean.MAYBE);
     }
 
     /** 
@@ -407,6 +402,22 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
             }
         }
     }
+    
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onLeftClickingBlocksOrAir(final PlayerInteractEvent event) {
+        final Player player = event.getPlayer();
+        if (event.getAction() != Action.LEFT_CLICK_AIR && event.getAction() != Action.LEFT_CLICK_BLOCK) {
+            return;
+        }
+        if (BridgeMisc.mayLungeForward(player)) {
+            final IPlayerData pData = DataManager.getPlayerData(player);
+            final PlayerMoveData thisMove = pData.getGenericInstance(MovingData.class).playerMoves.getCurrentMove();
+            thisMove.lungingForward = true;
+            if (pData.isDebugActive(CheckType.MOVING)) {
+                debug(player, "Set lunging forward flag in this move.");
+            }
+        }
+    }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawn(final PlayerRespawnEvent event) {
@@ -552,8 +563,14 @@ public class CombinedListener extends CheckListener implements JoinLeaveListener
             aux.returnPlayerMoveInfo(moveInfo);
             return;
         }
+        final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
+        if (BridgeMisc.mayLungeForward(player)) {
+            thisMove.lungingForward = true;
+            if (pData.isDebugActive(CheckType.MOVING)) {
+                debug(player, "Set lunging forward flag in this move.");
+            }
+        }
         if (pData.isSprinting() || !BlockProperties.isAir(stack) && stack.getEnchantmentLevel(Enchantment.KNOCKBACK) > 0) {
-            final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
             thisMove.hasAttackSlowDown = true;
             if (pData.isDebugActive(CheckType.MOVING)) {
                 debug(player, "Set attack slow down flag in this move.");

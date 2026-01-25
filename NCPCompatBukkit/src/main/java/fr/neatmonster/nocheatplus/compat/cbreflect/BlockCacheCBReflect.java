@@ -49,7 +49,26 @@ public class BlockCacheCBReflect extends BlockCacheBukkit {
         final double[] shape = LegacyBlocks.getShape(this, mat, x, y, z, true);
         if (shape != null) return shape;
         try {
-            return helper.nmsWorld_fetchBlockShape(this.nmsWorld, this.getType(x, y, z), x, y, z);
+            return LegacyBlocks.adjustBounds(this, mat, x, y, z, helper.nmsWorld_fetchBlockShape(this.nmsWorld, this.getType(x, y, z), x, y, z));
+        }
+        catch (ReflectFailureException ex) {
+            return super.fetchBounds(x, y, z);
+        }
+    }
+    
+    @Override
+    public boolean isCollisionSameVisual(int x, int y, int z) {
+        final org.bukkit.Material mat = getType(x, y, z);
+        return LegacyBlocks.isCollisionSameVisual(this, mat, x, y, z);
+    }
+    
+    @Override
+    public double[] fetchVisualBounds(int x, int y, int z) {
+        final org.bukkit.Material mat = getType(x, y, z);
+        final double[] shape = LegacyBlocks.getVisualShape(this, mat, x, y, z);
+        if (shape != null) return shape;
+        try {
+            return LegacyBlocks.adjustBounds(this, mat, x, y, z, helper.nmsWorld_fetchBlockShape(this.nmsWorld, this.getType(x, y, z), x, y, z));
         }
         catch (ReflectFailureException ex) {
             return super.fetchBounds(x, y, z);
