@@ -21,11 +21,7 @@ jobs:
         run: mvn clean package -P nonfree_build -P all
 
       - name: Upload NoCheatPlus
-        # TODO: Update release
-        uses: marvinpinto/action-automatic-releases@v1.2.1
+        uses: actions/upload-artifact@v7
         with:
-          title: "NoCheatPlus"
-          automatic_release_tag: "latest"
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          files: "target/*.jar"
-          prerelease: true
+          path: target/NoCheatPlus.jar
+          archive: false
