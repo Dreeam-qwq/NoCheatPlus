@@ -930,6 +930,57 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
             
             // Normal move: fire from -> to
             if (BridgeMisc.isWASDImpulseKnown(player)) data.input.set(player.getCurrentInput());
+            // Optimization: best-effort associate this normal Bukkit move with the latest queued flying packet,
+            // but only scan the "new since last match" prefix (no fallback scan).
+            {
+                final NetData netData = pData.getGenericInstance(NetData.class);
+                final long lastMatchedToSeq = netData.getLastMatchedMoveToSequence();
+                final DataPacketFlying[] flyingQueue = new FlyingQueueHandle(pData).getHandle();
+                int scanLimit = flyingQueue.length;
+                if (lastMatchedToSeq > 0) {
+                    scanLimit = 0;
+                    for (int idx = 0; idx < flyingQueue.length; idx++) {
+                        final DataPacketFlying packetData = flyingQueue[idx];
+                        if (packetData == null) {
+                            continue;
+                        }
+                        if (packetData.getSequence() <= lastMatchedToSeq) {
+                            break;
+                        }
+                        scanLimit = idx + 1; // exclusive
+                    }
+                }
+                int toIndex = -1;
+                for (int idx = 0; idx < scanLimit; idx++) {
+                    final DataPacketFlying packetData = flyingQueue[idx];
+                    if (packetData == null) {
+                        continue;
+                    }
+                    if (packetData.hasPos
+                        && TrigUtil.isSamePos(to.getX(), to.getY(), to.getZ(),
+                                              packetData.getX(), packetData.getY(), packetData.getZ())) {
+                        toIndex = idx;
+                        break;
+                    }
+                }
+                if (toIndex >= 0 && flyingQueue[toIndex] != null) {
+                    netData.updateLastMatchedMoveToSequence(flyingQueue[toIndex].getSequence());
+                    // Best-effort find the matching "from" anchor (older than "to") to store a per-event range.
+                    int fromIndex = -1;
+                    for (int idx = toIndex + 1; idx < flyingQueue.length; idx++) {
+                        final DataPacketFlying packetData = flyingQueue[idx];
+                        if (packetData == null || !packetData.hasPos) {
+                            continue;
+                        }
+                        //if (TrigUtil.isSamePos(from.getX(), from.getY(), from.getZ(),
+                        //                      packetData.getX(), packetData.getY(), packetData.getZ())) {
+                        fromIndex = idx;
+                        break;
+                        //}
+                    }
+                    //TODO: We now have some extra look,ground if fromIndex - toIndex > 1. Now how to feed in 0.03 reconstructor if there is, from here? 
+                }
+            }
             moveInfo.set(player, from, to, cc.yOnGround);
             checkPlayerMove(player, from, to, 0, moveInfo, debug, data, cc, pData, event, true);
         }
@@ -940,14 +991,34 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
             final DataPacketFlying[] flyingQueue = flyingHandle.getHandle();
             // 1: Locate Bukkit's 'from' and 'to' locations on packet-level in the flying queue.
             if (flyingQueue.length != 0) {
+                final NetData netData = pData.getGenericInstance(NetData.class);
+                final long lastMatchedToSeq = netData.getLastMatchedMoveToSequence();
                 /* Index of Bukkit's "from" location in the flying queue. -1 if already purged out of the queue or cannot be found for any other reason. */
                 int fromIndex = -1;
                 /* Index of Bukkit's "to" location in the flying queue. -1 if already purged out of the queue or cannot be found for any other reason.*/
                 int toIndex = -1;
                 // Require at least this many packets strictly between to/from. Set 0 if adjacent is allowed.
-                final int minGap = 1; 
-                // if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_13)) // Left-over from some testings... What were we doing here?
-                for (int idx = 0; idx < flyingQueue.length; idx++) {
+                final int minGap = 1;
+                // Phase 1 (fast path): Scan only packets newer than the last matched "to" sequence.
+                // If we can't find the anchors in the new prefix, fall back to scanning the full queue.
+                int scanLimit = flyingQueue.length;
+                if (lastMatchedToSeq > 0) {
+                    scanLimit = 0;
+                    for (int idx = 0; idx < flyingQueue.length; idx++) {
+                        final DataPacketFlying packetData = flyingQueue[idx];
+                        if (packetData == null) {
+                            continue;
+                        }
+                        if (packetData.getSequence() <= lastMatchedToSeq) {
+                            break;
+                        }
+                        scanLimit = idx + 1; // exclusive
+                    }
+                    // If everything is older/equal, keep scanLimit at 0 -> immediate fallback below.
+                }
+
+                // Pass 1: scan the "new" prefix [0..scanLimit).
+                for (int idx = 0; idx < scanLimit; idx++) {
                     final DataPacketFlying packetData = flyingQueue[idx];
                     if (packetData == null || !packetData.hasPos) {
                         continue;
@@ -958,10 +1029,33 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                     else if (fromIndex == -1 && TrigUtil.isSamePos(from.getX(), from.getY(), from.getZ(), packetData.getX(), packetData.getY(), packetData.getZ())) {
                         fromIndex = idx;
                     }
-                    if (fromIndex > 0 && toIndex >= 0) {
-                        // Found both (NOTE: toIndex MUST be checked for equality).
+                    if (fromIndex >= 0 && toIndex >= 0) {
                         break;
                     }
+                }
+
+                // Pass 2: if needed, continue scanning only the older tail [scanLimit..end).
+                if (fromIndex == -1 || toIndex == -1) {
+                    for (int idx = scanLimit; idx < flyingQueue.length; idx++) {
+                        final DataPacketFlying packetData = flyingQueue[idx];
+                        if (packetData == null || !packetData.hasPos) {
+                            continue;
+                        }
+                        if (toIndex == -1 && TrigUtil.isSamePos(to.getX(), to.getY(), to.getZ(), packetData.getX(), packetData.getY(), packetData.getZ())) {
+                            toIndex = idx;
+                        }
+                        else if (fromIndex == -1 && TrigUtil.isSamePos(from.getX(), from.getY(), from.getZ(), packetData.getX(), packetData.getY(), packetData.getZ())) {
+                            fromIndex = idx;
+                        }
+                        if (fromIndex >= 0 && toIndex >= 0) {
+                            break;
+                        }
+                    }
+                }
+
+                // If we successfully matched, advance the sequence cursor to the "to" anchor.
+                if (toIndex >= 0 && flyingQueue[toIndex] != null) {
+                    netData.updateLastMatchedMoveToSequence(flyingQueue[toIndex].getSequence());
                 }
                 // 1.1: Not found or too few moves were skipped, return to legacy split moves
                 if (fromIndex < 0 || toIndex < 0 || fromIndex - toIndex <= minGap) {
@@ -975,14 +1069,14 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                     return;
                 }
                 // 2: Filter out null and ground only packets; synchronize the input change with the correct flying packet on when it happened
-                final DataPacketInput[] inputQueue = pData.getGenericInstance(NetData.class).copyInputQueue();
+                final DataPacketInput[] inputQueue = netData.copyInputQueue();
                 // Prepare array to hold the filtered packets between fromIndex and toIndex (inclusive). 
                 final DataPacketFlying[] filteredFlyingQueue = new DataPacketFlying[fromIndex - toIndex + 1];
                 int j = 0;
                 // NOTE: Inverted from last versions for easier code
                 for (int i = toIndex; i <= fromIndex; i++) {
                     // (Let the early return above handle duplicate 1.17 packets)
-                    if (flyingQueue[i] != null && (flyingQueue[i].hasPos || flyingQueue[i].hasLook)) {
+                    if (flyingQueue[i] != null) {
                         // All valid flying packets are put in their array
                         filteredFlyingQueue[j] = flyingQueue[i];
                         j++;
@@ -992,6 +1086,8 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                 int count = 1;
                 // The maximum amount by which a single PlayerMoveEvent can be split.
                 int maxSplit = 20;
+                int currentFromIndex = -1;
+                int currentToIndex = -1;
                 float currentYaw = from.getYaw();
                 float currentPitch = from.getPitch();
                 Location packet = null;
@@ -1006,6 +1102,8 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                     if (filteredFlyingQueue[i].hasPos) {
                         // If from was set...
                         if (packet != null) {
+                            // TODO: We now have some extra look,ground if fromIndex - toIndex > 1. Now how to feed in 0.03 reconstructor if there is, from here?
+                            currentToIndex = count >= maxSplit ? -1 : i;
                             /* The 'to' location skipped/lost by Bukkit in the flying queue. Use Bukkit's "to" if the maximum split was reached */
                             Location packetTo = count >= maxSplit ? to : new Location(from.getWorld(), filteredFlyingQueue[i].getX(), filteredFlyingQueue[i].getY(), filteredFlyingQueue[i].getZ(), currentYaw, currentPitch);
                             // Finally, set the moving data to be used by checks.
@@ -1036,6 +1134,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                             }
                         }
                         /* The 'from' location skipped/lost by Bukkit in the flying queue */
+                        currentFromIndex = i;
                         packet = new Location(from.getWorld(), filteredFlyingQueue[i].getX(), filteredFlyingQueue[i].getY(), filteredFlyingQueue[i].getZ(), currentYaw, currentPitch);
                     }
                 }

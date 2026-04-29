@@ -99,9 +99,16 @@ public class NetData extends ACheckData {
     private final LinkedList<DataPacketFlying> flyingQueue = new LinkedList<DataPacketFlying>();
     /** Maximum amount of packets to store. */
     private final LinkedList<DataPacketInput> inputQueue = new LinkedList<DataPacketInput>();
-    private final int flyingQueueMaxSize = 30; // TODO: Might want to increase, what if the server-side lag then it can recover and receiving lots of packet? Like try pasting large structure using WorldEdit. 
+    private final int flyingQueueMaxSize = 60; // Reduce eviction under lag spikes / main-thread stalls.
     /** The maximum of so far already returned sequence values, altered under lock. */
     private long maxSequence = 0;
+    /**
+     * Sequence cursor for the last flying packet that has been successfully
+     * associated with a Bukkit PlayerMoveEvent (typically the packet matching the event "to").
+     * <p>
+     * Guarded by {@link #lock} to keep it consistent with queue snapshots.
+     */
+    private long lastMatchedMoveToSequence = 0;
 
     /** Overall packet frequency. */
     public final ActionFrequency packetFrequency;
@@ -213,6 +220,8 @@ public class NetData extends ACheckData {
     public void clearFlyingQueue() {
         lock.lock();
         flyingQueue.clear();
+        maxSequence = 0;
+        lastMatchedMoveToSequence = 0;
         lock.unlock();
 
         locki.lock();
@@ -220,6 +229,34 @@ public class NetData extends ACheckData {
         locki.unlock();
     }
 
+    /**
+     * Get the last matched move "to" sequence cursor (under lock).
+     *
+     * @return 0 if never set or after reset.
+     */
+    public long getLastMatchedMoveToSequence() {
+        lock.lock();
+        final long out = lastMatchedMoveToSequence;
+        lock.unlock();
+        return out;
+    }
+
+    /**
+     * Update the last matched move "to" sequence cursor (under lock).
+     * Only increases the value (monotonic), to stay safe on unusual control flow.
+     *
+     * @param sequence Sequence to set as "last matched to".
+     */
+    public void updateLastMatchedMoveToSequence(final long sequence) {
+        if (sequence <= 0) {
+            return;
+        }
+        lock.lock();
+        if (sequence > lastMatchedMoveToSequence) {
+            lastMatchedMoveToSequence = sequence;
+        }
+        lock.unlock();
+    }
     /**
      * Copy the entire flying queue (under lock).
      * 

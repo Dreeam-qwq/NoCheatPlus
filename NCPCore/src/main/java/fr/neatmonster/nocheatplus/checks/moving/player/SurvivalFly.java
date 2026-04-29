@@ -1084,16 +1084,32 @@ public class SurvivalFly extends Check {
         double yDistanceBeforeCollide = lastMove.toIsValid ? lastMove.yDistance : 0.0; 
         if (lastMove.from.inWater) {
             yDistanceBeforeCollide *= data.lastFrictionVertical;
-            // NOTE: For fluid falling, it should be thisMove not last. the allowed distance is already initialised with lastMove's distance; calling the last ALLOWED distance, would basically mean using the momentum of the second last move, which is incorrect.
-            // Here, we use yDistanceBeforeCollide as thisMove.yAllowedDistance has not yet been calculated at this point.
-            Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, yDistanceBeforeCollide <= 0.0, new Vector(0.0, yDistanceBeforeCollide, 0.0), cData.wasSprinting);
-            yDistanceBeforeCollide = fluidFallingAdjustMovement.getY();
+            if (BridgeMisc.hasGravity(player)) {
+                // Legacy: clients older than 1.13 have some kind of gravity effect applied to them even in liquids, if they don't press the space bar.
+                // On 1.13 and above, only friction gets applied, resulting in a much slower descending speed when not pressing the space bar pressed.
+                if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) {
+                    yDistanceBeforeCollide -= Magic.LEGACY_LIQUID_GRAVITY;
+                } 
+                else {
+                    // In 1.13 the gravity effect in liquids was removed and this function got added.
+                    Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, yDistanceBeforeCollide <= 0.0, new Vector(0.0, yDistanceBeforeCollide, 0.0), cData.wasSprinting);
+                    yDistanceBeforeCollide = fluidFallingAdjustMovement.getY();
+                }
+            }
         }
         else if (lastMove.from.inLava) {
             if (data.lastFrictionVertical != Magic.LAVA_VERTICAL_INERTIA) {
                 yDistanceBeforeCollide *= data.lastFrictionVertical;
-                Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, yDistanceBeforeCollide <= 0.0, new Vector(0.0, yDistanceBeforeCollide, 0.0), cData.wasSprinting);
-                yDistanceBeforeCollide = fluidFallingAdjustMovement.getY();
+                if (BridgeMisc.hasGravity(player)) {
+                    if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) {
+                        yDistanceBeforeCollide -= Magic.LEGACY_LIQUID_GRAVITY;
+                    } 
+                    else {
+                        // In 1.13 the gravity effect in liquids was removed and this function got added.
+                        Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, yDistanceBeforeCollide <= 0.0, new Vector(0.0, yDistanceBeforeCollide, 0.0), cData.wasSprinting);
+                        yDistanceBeforeCollide = fluidFallingAdjustMovement.getY();
+                    }
+                }
             }
             else {
                 yDistanceBeforeCollide *= data.lastFrictionVertical;
@@ -1330,9 +1346,10 @@ public class SurvivalFly extends Check {
            Otherwise, only the combined horizontal distance will be checked against the offset.
         */
         boolean strict = cc.survivalFlyStrictHorizontal;
+        final double hiddenThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
         for (i = 0; i < 9; i++) {
-            if (!collideX[i] && !collideZ[i] 
-                && MathUtil.dist(xTheoreticalDistance[i], zTheoreticalDistance[i]) < (pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? 0.03 : 0.0002)) {
+            if (!collideX[i] && !collideZ[i] && thisMove.yDistance < hiddenThreshold
+                && MathUtil.dist(xTheoreticalDistance[i], zTheoreticalDistance[i]) < hiddenThreshold) {
                 thisMove.hiddenDistanceIndex = i;
             }
             if (strict) {
@@ -1607,6 +1624,7 @@ public class SurvivalFly extends Check {
         thisMove.yAllowedDistance = forceResetMomentum || touchDownIsLost 
                                     || (lastMove.yDistance < 0.0 && (fromOnGround || thisMove.fromLostGround))
                                     || !lastMove.toIsValid ? 0.0 : lastMove.yDistance;
+        if (lastMove.yCorrectedDistancePre != 0.0) thisMove.yAllowedDistance = lastMove.yCorrectedDistancePre;
         //////////////////////////////////////
         // Next client-tick/move            //
         //////////////////////////////////////
@@ -1903,11 +1921,34 @@ public class SurvivalFly extends Check {
         // Calculate the offset: check for velocity and workarounds on violations // 
         ////////////////////////////////////////////////////////////////////////////
         if (yTheoreticalDistance != null) {
+            final double hiddenThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
+            if (thisMove.hDistance < hiddenThreshold) {
+                for (int i = 0; i < yTheoreticalDistance.length; i++) {
+                    if (yTheoreticalDistance[i] < hiddenThreshold && !collideLiquidY[i]) {
+                        thisMove.hiddenYDistanceIndex = i;
+                        break;
+                    }
+                }
+            }
+            boolean found = false;
             for (int i = 0; i < yTheoreticalDistance.length; i++) {
                 if (MathUtil.isOffsetWithinPredictionEpsilon(thisMove.yDistance, yTheoreticalDistance[i])) {
                     thisMove.yAllowedDistance = yTheoreticalDistance[i];
                     thisMove.collideY = collideLiquidY[i];
+                    found = true;
                     break;
+                }
+            }
+            if (!found && thisMove.hiddenYDistanceIndex != -1) {
+                final double result[] = HiddenMotionReconstructor.findBestHiddenTickExplanation(yTheoreticalDistance[thisMove.hiddenYDistanceIndex], player, data, cData, pData, from, to, attributeAccess.getHandle().getJumpGainMultiplier(player), 
+                        verticalLiquidPushComponent, onGround, yTheoreticalDistance[thisMove.hiddenYDistanceIndex]);
+                yTheoreticalDistance[thisMove.hiddenYDistanceIndex] += result[0];
+                if (MathUtil.isOffsetWithinPredictionEpsilon(thisMove.yDistance, yTheoreticalDistance[thisMove.hiddenYDistanceIndex])) {
+                    thisMove.yAllowedDistance = yTheoreticalDistance[thisMove.hiddenYDistanceIndex];
+                    thisMove.collideY = collideLiquidY[thisMove.hiddenYDistanceIndex];
+                    thisMove.yCorrectedDistancePre = result[0];
+                    found = true;
+                    tags.add("v_hidden");
                 }
             }
         }

@@ -14,11 +14,16 @@
  */
 package fr.neatmonster.nocheatplus.checks.moving.player;
 
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
+import fr.neatmonster.nocheatplus.checks.combined.CombinedData;
 import fr.neatmonster.nocheatplus.checks.moving.MovingData;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerKeyboardInput;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
+import fr.neatmonster.nocheatplus.compat.Bridge1_13;
+import fr.neatmonster.nocheatplus.compat.BridgeMisc;
 import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
 import fr.neatmonster.nocheatplus.players.IPlayerData;
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
@@ -134,6 +139,288 @@ public class HiddenMotionReconstructor {
         return new double[] {resultX, resultZ};
     }
     
+    private static double doNegligibleMomentumVertical(IPlayerData pData, double yDistance) {
+        double resultY = yDistance;
+        
+        if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_9)) {
+            if (Math.abs(resultY) < Magic.NEGLIGIBLE_SPEED_THRESHOLD) {
+                resultY = 0.0;
+            }
+        }
+        else {
+            if (Math.abs(resultY) < Magic.NEGLIGIBLE_SPEED_THRESHOLD_LEGACY) {
+                resultY = 0.0;
+            }
+        }
+        return resultY;
+    }
+    
+    private static double[] reconstructHiddenTicksRecursive(final double yDistance, final Player player, final MovingData data, final CombinedData cData, final IPlayerData pData, final PlayerLocation from, final PlayerLocation to, final double jumpGain, final double verticalLiquidPushComponent, final boolean onGround, final int depthRemaining, final double totalY,
+            final double targetY, final int depthIndex) {
+        final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
+        
+        // ------------------------------------------------------------------
+        // Early exit 1: accumulated displacement already matches the target.
+        // ------------------------------------------------------------------
+        if (MathUtil.isOffsetWithinPredictionEpsilon(totalY, targetY)) {
+            return new double[]{0.0, targetY - totalY};
+        }
+        
+        // ------------------------------------------------------------------
+        // Early exit 2: depth cap reached — return the residual as-is.
+        // SurvivalFly will decide whether the error is acceptable.
+        // ------------------------------------------------------------------
+        if (depthRemaining == 0) {
+            return new double[]{0.0, targetY - totalY};
+        }
+        
+        // ------------------------------------------------------------------
+        // Early exit 3: the incoming momentum is already above the suppression
+        // threshold, so this tick cannot be a hidden tick — stop recursing.
+        // The threshold differs between old and new protocol versions.
+        // ------------------------------------------------------------------
+        final double suppressionThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
+        if (yDistance > suppressionThreshold) {
+            return new double[]{0.0, targetY - totalY};
+        }
+        
+        final PlayerMoveData lastMove = data.playerMoves.getFirstPastMove();
+        double baseY = yDistance;
+        if (pData.isShiftKeyPressed() && lastMove.collideY) { 
+            if (baseY < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
+                if (lastMove.to.onBouncyBlock) {
+                    // The effect works by inverting the distance.
+                    // Beds have a weaker bounce effect (BedBlock.java).
+                    baseY = lastMove.to.onSlimeBlock ? -baseY : -baseY * 0.66;
+                }
+            }
+        }
+        // *----------tryCheckInsideBlocks()----------*
+        // Bubble columns are checked in the tryCheckInsideBlocks method, so it comes after updateEntityAfterFallOn()...
+        Vector bubbleVector = from.tryApplyBubbleColumnMotion(new Vector(0.0, baseY, 0.0));
+        baseY = bubbleVector.getY();
+        // Honey block sliding mechanic...
+        if (from.isSlidingDown()) {
+            // Speed is static in this case
+            baseY = -Magic.SLIDE_SPEED_THROTTLE;
+        }
+        // *----------stuck-speed-momentum-reset----------*
+        if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) {
+            if (data.lastStuckInBlockVertical != 1.0) {
+                baseY = 0.0;
+            }
+        }
+        // *----------Finalization of handleRelativeFrictionAndCalculateMovement; this check/condition is called after having called the move() function. The former method is called only when the player is traveling in air, thus the liquid and gliding checks ----------*
+        if (!lastMove.from.inLiquid && !lastMove.isGliding) {
+            // TODO: We have to loop the jumping state for 1.21.1 and below... No other way to put it unfortunately. This will make the code an ugly mess than it already is.
+            final boolean jumpedOrCollided = lastMove.collidesHorizontally;
+            if (jumpedOrCollided && (lastMove.from.onClimbable || lastMove.from.touchedPowderSnow && BridgeMisc.canStandOnPowderSnow(player))) { 
+                baseY = 0.2;
+            }
+        }
+        // *----------Gravity, friction and other medium-dependent modifiers in LivingEntity.travel() (water first, then lava and finally air)----------*
+        if (lastMove.from.inWater) {
+            if (lastMove.collidesHorizontally && lastMove.from.onClimbable && pData.getClientVersion().isAtLeast(ClientVersion.V_1_14)) {
+                baseY = 0.2;
+            }
+            // Water applies friction before calling the fluidFalling function.
+            baseY *= data.lastFrictionVertical;
+            if (BridgeMisc.hasGravity(player)) {
+                // Legacy: clients older than 1.13 have some kind of gravity effect applied to them even in liquids, if they don't press the space bar.
+                // On 1.13 and above, only friction gets applied, resulting in a much slower descending speed when not pressing the space bar pressed.
+                if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) {
+                    baseY -= Magic.LEGACY_LIQUID_GRAVITY;
+                } 
+                else {
+                    // In 1.13 the gravity effect in liquids was removed and this function got added.
+                    Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, baseY <= 0.0, new Vector(0.0, baseY, 0.0), cData.wasSprinting);
+                    baseY = fluidFallingAdjustMovement.getY();
+                }
+            }
+        }
+        else if (lastMove.from.inLava) {
+            // Lava friction is quite odd. Depending on specified thresholds, it can be 0.5 or 0.8
+            if (data.lastFrictionVertical != Magic.LAVA_VERTICAL_INERTIA) { // Note that this condition is not vanilla. It's just a shortcut to avoid replicating the condition contained in BlockProperties.getBlockFrictionFactor.
+                baseY *= data.lastFrictionVertical;
+                if (BridgeMisc.hasGravity(player)) {
+                    if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) {
+                        baseY -= Magic.LEGACY_LIQUID_GRAVITY;
+                    } 
+                    else {
+                        // getFluidFallingAdjustedMovement is only applied if friction is 0.8.
+                        Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, baseY <= 0.0, new Vector(0.0, baseY, 0.0), cData.wasSprinting);
+                        baseY = fluidFallingAdjustMovement.getY();
+                    }
+                }
+            }
+            else {
+                // Otherwise, 0.5
+                baseY *= data.lastFrictionVertical;
+            }
+            if (data.lastGravity != 0.0) {
+                baseY += -data.lastGravity / 4.0;
+            }
+        }
+        else {
+            // Air motion
+            if (cData.wasLevitating) {
+                // Levitation forces players to ascend and does not work in liquids, so thankfully we don't have to account for that, other than stuck-speed.
+                baseY += (0.05 * data.lastLevitationLevel - (depthIndex == 0 ? lastMove.yAllowedDistance : yDistance)) * 0.2;
+            }
+            else baseY -= data.lastGravity;
+            baseY *= data.lastFrictionVertical;
+        }
+        // *----------Finalize LivingEntity.travel; isFree() check----------*
+        // Try making the player jump out of the liquid... 
+        // This condition is the same for both lava and water, and is always done at the end of the travel() function.
+        if (lastMove.from.inLiquid && lastMove.collidesHorizontally 
+            // TODO: Somewhat work. Incorrect horizontal move. Require this function call at the time BOTH horizontal and vertical calculating at the same time. Which is not possible with current infrastructure
+            && from.isUnobstructed()) {
+            baseY = 0.3;
+        }
+        
+        
+        //////////////////////////////////
+        // Last client-tick/move        //
+        //////////////////////////////////
+        if (from.isInLiquid() && verticalLiquidPushComponent != 0.0) {
+            // Liquid vertical push component calculated in hdistrel.
+            baseY += verticalLiquidPushComponent;
+        }
+        // *----------LivingEntity.aiStep(), negligible speed----------*
+        baseY = doNegligibleMomentumVertical(pData, baseY);
+        // *----------LivingEntity.travel(), handleRelativeFrictionAndCalculateMovement() -> handleOnClimbable()----------*
+        // TODO: Is it correct to put here?
+        if (!from.isInLiquid() && from.isOnClimbable() && from.canClimbUp(data.liftOffEnvelope.getMaxJumpHeight(data.jumpAmplifier))) {
+            baseY = Math.max(baseY, -Magic.CLIMBABLE_MAX_SPEED);
+            // Should replicate the condition: !this.getInBlockState().is(Blocks.SCAFFOLDING)
+            final Material typeId = from.getBlockType();
+            final long theseFlags = BlockFlags.getBlockFlags(typeId);
+            if (baseY < 0.0 && pData.isShiftKeyPressed()
+                && (theseFlags & BlockFlags.F_SCAFFOLDING) == 0 && pData.getClientVersion().isAtLeast(ClientVersion.V_1_14)) {
+                baseY = 0.0;
+            }
+        }
+        double[] yTheoreticalDistance = null;
+        // *----------EntityLiving.aiStep(), apply liquid motion----------*
+        if (from.isInLiquid()) {
+            yTheoreticalDistance = new double[3];
+            // *----------LocalPlayer.aiStep(), goDownInWater()----------*
+            if (pData.isShiftKeyPressed() && from.isInWater()) {
+                baseY -= Magic.LIQUID_SPEED_GAIN;
+            }
+            // With space bar pressed
+            yTheoreticalDistance[0] = baseY;
+            // With space bar not pressed
+            yTheoreticalDistance[1] = baseY;
+            // With swimming speed not applied
+            yTheoreticalDistance[2] = baseY;
+            boolean isSubmergedInWater = from.isInWater() && thisMove.submergedWaterHeight > 0.0;
+            double fluidJumpThreshold = from.getEyeHeight() < 0.4D ? 0.0D : 0.4D;
+            if (isSubmergedInWater && (!onGround || thisMove.submergedWaterHeight > fluidJumpThreshold)) {
+                yTheoreticalDistance[0] += Magic.LIQUID_SPEED_GAIN;
+            }
+            else if (from.isInLava() && (!onGround || thisMove.submergedLavaHeight > fluidJumpThreshold)) {
+                yTheoreticalDistance[0] += Magic.LIQUID_SPEED_GAIN;
+            }
+            else if ((onGround || isSubmergedInWater && thisMove.submergedWaterHeight <= fluidJumpThreshold) && data.jumpDelay == 0) {
+                yTheoreticalDistance[0] = data.liftOffEnvelope.getJumpGain(data.jumpAmplifier) * jumpGain;
+                //data.jumpDelay = Magic.MAX_JUMP_DELAY;
+                //thisMove.hasImpulse = AlmostBoolean.YES;
+                // (Can't set thisMove.isJump yet.)
+            }
+            if (Bridge1_13.isSwimming(player) && !player.isInsideVehicle()) {
+                Vector lookVector = TrigUtil.getLookingDirection(to, player);
+                double swimmingScalar = lookVector.getY() < -0.2 ? 0.085 : 0.06;
+            // Note: Since thisMove.isJump is always false because not been set yet, make these conditions unusable, result in brute force
+            //if (lookVector.getY() <= 0.0 || thisMove.isJump 
+            //    || BlockProperties.getLiquidHeightAt(from.getBlockCache(), Location.locToBlock(from.getX()), Location.locToBlock(from.getY()+1.0-0.1), Location.locToBlock(from.getZ()), BlockFlags.F_WATER, true) != 0.0) {
+                yTheoreticalDistance[0] += (lookVector.getY() - yTheoreticalDistance[0]) * swimmingScalar;
+                yTheoreticalDistance[1] += (lookVector.getY() - yTheoreticalDistance[1]) * swimmingScalar;
+            //}
+            }
+        }
+
+        // *----------Beginning of EntityLiving.travel(); call Entity.move(); apply stuck speed multipliers----------*
+        if (TrigUtil.lengthSquared(data.nextStuckInBlockHorizontal, data.nextStuckInBlockVertical, data.nextStuckInBlockHorizontal) > 1.0E-7) {
+            // If we looped the space bar impulse, all later modifiers are applied to each speed.
+            if (yTheoreticalDistance != null) {
+                for (int i = 0; i < yTheoreticalDistance.length; i++) {
+                    yTheoreticalDistance[i] *= data.nextStuckInBlockVertical;
+                }
+            } else baseY *= data.nextStuckInBlockVertical; 
+        }
+        double[] best = null;
+        double bestErrSq = Double.MAX_VALUE;
+        if (yTheoreticalDistance != null) {
+            for (int i = 0; i < yTheoreticalDistance.length; i++) {
+                // Check whether adding this tick's displacement gets us within epsilon of the target.
+                final double nextTotalY = totalY + yTheoreticalDistance[i];
+                //System.out.println(resultX + " | " + resultZ);
+                if (MathUtil.isOffsetWithinPredictionEpsilon(nextTotalY, targetY)) {
+                    // Perfect match, short-circuit immediately, no need to recurse.
+                    return new double[] {yTheoreticalDistance[i], targetY - nextTotalY};
+                }
+                // Recurse one level deeper with this candidate's resulting velocity.
+                double[] nextRes = reconstructHiddenTicksRecursive(yTheoreticalDistance[i], player, data, cData, pData, from, to, 
+                                                                   jumpGain, verticalLiquidPushComponent, onGround, 
+                                                                   depthRemaining - 1, nextTotalY, targetY, depthIndex + 1);
+            
+                // Fold the sub-result back: accumulated displacement = this tick + child ticks.
+                double[] candidate = new double[] {
+                        nextRes[0] + yTheoreticalDistance[i],
+                        nextRes[1]
+                };
+            
+                // Keep the candidate with the smallest residual error.
+                double candidateErrSq = candidate[1] * candidate[1];
+                if (best == null || candidateErrSq < bestErrSq) {
+                    best = candidate;
+                    bestErrSq = candidateErrSq;
+                }
+            
+                // Early exit: residual is already within acceptable tolerance — no point
+                // testing the remaining candidates.
+                if (candidateErrSq <= ACCEPTABLE_ERROR_SQUARED) {
+                    return candidate;
+                }
+            }
+        } else {
+            final double nextTotalY = totalY + baseY;
+            if (MathUtil.isOffsetWithinPredictionEpsilon(nextTotalY, targetY)) {
+                // Perfect match, short-circuit immediately, no need to recurse.
+                return new double[] {baseY, targetY - nextTotalY};
+            }
+        
+            // Recurse one level deeper with this candidate's resulting velocity.
+            double[] nextRes = reconstructHiddenTicksRecursive(baseY, player, data, cData, pData, from, to, 
+                                                               jumpGain, verticalLiquidPushComponent, onGround, 
+                                                               depthRemaining - 1, nextTotalY, targetY, depthIndex + 1);
+        
+            // Fold the sub-result back: accumulated displacement = this tick + child ticks.
+            double[] candidate = new double[] {
+                    nextRes[0] + baseY,
+                    nextRes[1]
+            };
+        
+            // Keep the candidate with the smallest residual error.
+            double candidateErrSq = candidate[1];
+            if (best == null || candidateErrSq < bestErrSq) {
+                best = candidate;
+                bestErrSq = candidateErrSq;
+            }
+        
+            // Early exit: residual is already within acceptable tolerance — no point
+            // testing the remaining candidates.
+            if (candidateErrSq <= ACCEPTABLE_ERROR_SQUARED) {
+                return candidate;
+            }
+        }
+        // Return the best candidate found, or a zero-displacement fallback if somehow
+        // the candidate list was empty (should never happen with 1 fixed candidates).
+        return best != null ? best : new double[] {0.0, targetY - totalY};
+    }
+    
     /**
      * Recursively searches for a sequence of hidden tick inputs that best explains
      * the observed position delta, using a depth-limited brute-force over all nine
@@ -210,7 +497,7 @@ public class HiddenMotionReconstructor {
         // threshold, so this tick cannot be a hidden tick — stop recursing.
         // The threshold differs between old and new protocol versions.
         // ------------------------------------------------------------------
-        final double suppressionThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? 0.03 : 0.0002;
+        final double suppressionThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
         if (MathUtil.dist(xDistance, zDistance) > suppressionThreshold) {
             return new double[]{0.0, 0.0, targetX - totalX, targetZ - totalZ};
         }
@@ -513,5 +800,11 @@ public class HiddenMotionReconstructor {
                                                xDistance, zDistance, data, pData, from, onGround, MAX_HIDDEN_TICK_DEPTH,
                                                totalX, totalZ, crouching, sneakingFactor, usingItem,
                                                thisMove.xDistance, thisMove.zDistance, 0);
+    }
+    public static double[] findBestHiddenTickExplanation(final double yDistance, final Player player, final MovingData data, final CombinedData cData, final IPlayerData pData, 
+                                                         final PlayerLocation from, final PlayerLocation to, final double jumpGain, 
+                                                         final double verticalLiquidPushComponent, final boolean onGround, final double totalY) {
+        final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
+        return reconstructHiddenTicksRecursive(yDistance, player, data, cData, pData, from, to, jumpGain, verticalLiquidPushComponent, onGround, MAX_HIDDEN_TICK_DEPTH, totalY, thisMove.yDistance, 0);
     }
 }

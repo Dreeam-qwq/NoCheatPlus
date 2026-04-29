@@ -129,6 +129,8 @@ public class PlayerMoveData extends MoveData {
      */
     public int hiddenDistanceIndex;
     
+    public int hiddenYDistanceIndex;
+    
     /**
      * Is there stop motion during/after hidden move happening? <br>
      * VOLATILE by design and should not be use elsewhere
@@ -152,6 +154,11 @@ public class PlayerMoveData extends MoveData {
      * not require correction.</p>
      */
     public double xCorrectedDistancePre;
+
+    /**
+     * Mirror of {@link #xCorrectedDistancePre} for the Y axis.
+     */
+    public double yCorrectedDistancePre;
     
     /**
      * Mirror of {@link #xCorrectedDistancePre} for the Z axis.
@@ -160,7 +167,7 @@ public class PlayerMoveData extends MoveData {
     
     /**
      * Additive motion for the end of next move to use. Borrow and return effect. <br>
-     * There are 2 sources of this: hidden move and ground riptide.
+     * There are 2 sources of this: hidden move(stop motion) and ground riptide.
      */
     // TODO: Use this to handle ground riptide, cleaner code
     public double xCorrectedDistancePost;
@@ -305,8 +312,10 @@ public class PlayerMoveData extends MoveData {
         yAllowedDistance = 0.0;
         zAllowedDistance = 0.0;
         hiddenDistanceIndex = -1;
+        hiddenYDistanceIndex = -1;
         possibleStopMotion = false;
         xCorrectedDistancePre = 0.0;
+        yCorrectedDistancePre = 0.0;
         zCorrectedDistancePre = 0.0;
         xCorrectedDistancePost = 0.0;
         zCorrectedDistancePost = 0.0;
