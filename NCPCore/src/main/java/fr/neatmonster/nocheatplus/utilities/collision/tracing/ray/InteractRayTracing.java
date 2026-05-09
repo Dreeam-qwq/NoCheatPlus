@@ -116,7 +116,7 @@ public class InteractRayTracing extends RayTracing {
             // Ignore non solid blocks anyway.
             return false;
         }
-        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE | BlockFlags.F_STAIRS | BlockFlags.F_VARIABLE)) != 0) {
+        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE_CHECK | BlockFlags.F_STAIRS | BlockFlags.F_VARIABLE)) != 0) {
 
             // Special cases.
             // TODO: F_VARIABLE: Bounding boxes are roughly right ?

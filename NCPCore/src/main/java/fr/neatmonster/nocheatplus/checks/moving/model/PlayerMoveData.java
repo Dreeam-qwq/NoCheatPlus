@@ -115,17 +115,34 @@ public class PlayerMoveData extends MoveData {
     public double zAllowedDistance;
     
     /**
-     * Identifies which entry in the reconstructor's candidate result array was used
-     * as the corrected distance for this move, or {@code -1} if no hidden-tick
-     * reconstruction was performed.
+     * Index (0..8) into the 9-element WASD candidate arrays used by
+     * {@code SurvivalFly} when client inputs are unknown. The index selects which
+     * WASD candidate (combination of strafe/forward) produced a final
+     * post-collision horizontal displacement that falls below the client's
+     * movement-send suppression threshold (and therefore could have been
+     * "hidden" / not sent by the client).
      *
-     * <p>Used as a signal on the following tick: if {@code hiddenDistanceIndex != -1},
-     * the corrected distance came from the WASD brute-force path
-     * ({@link HiddenMotionReconstructor#findBestHiddenTickExplanation}), which
-     * means the player may have been coasting to a stop during the suppressed frames.
-     * The next move therefore sets {@code possibleStopMotion = true} so that, if the
-     * estimate still fails, the failure handler can retry with
-     * {@link HiddenMotionReconstructor#simulateStoppingMotion}.</p>
+     * <p>Semantics and usage:
+     * <ul>
+     *   <li>Set during the candidate loop in {@code SurvivalFly} whenever a
+     *       candidate's post-collision displacement is below the suppression
+     *       threshold; {@code -1} means "no candidate recorded". If multiple
+     *       candidates match, the last matching index overwrites earlier ones.</li>
+     *   <li>When non-negative, this index is used immediately (in the same
+     *       tick) to seed {@link fr.neatmonster.nocheatplus.checks.moving.player.HiddenMotionReconstructor#findBestHiddenTickExplanation}.
+     *       The reconstructor attempts to explain the observed movement by
+     *       simulating additional hidden ticks and returns cumulative
+     *       displacements which are stored in the "corrected distance" fields
+     *       (e.g. {@code xCorrectedDistancePre/Post}).</li>
+     *   <li>The returned corrected distances are applied either as a starting
+     *       allowed momentum for the following tick ({@code xCorrectedDistancePre})
+     *       or folded into candidate computations for the current tick
+     *       ({@code xCorrectedDistancePost}). A special-case "hdistzero" stores
+     *       post-corrections when the observed move has zero displacement.</li>
+     * </ul>
+     * <p>In short: this field identifies the WASD candidate used as the seed for
+     * hidden-tick reconstruction. It is not the corrected distance itself (the
+     * reconstructor computes that); it only points to which candidate was used.</p>
      */
     public int hiddenDistanceIndex;
     
@@ -138,20 +155,12 @@ public class PlayerMoveData extends MoveData {
     public boolean possibleStopMotion;
     
     /**
-     * Stores the corrected X displacement computed by
-     * {@link HiddenMotionReconstructor#findBestHiddenTickExplanation} for the
-     * <em>previous</em> move.
+     * Corrected X displacement computed for the previous move by the hidden-tick
+     * reconstructor.
      *
-     * <p>On the <em>next</em> tick, {@code estimateNextSpeed} reads this value as the
-     * opening momentum instead of {@code lastMove.xDistance}, so that the suppressed
-     * ticks' accumulated displacement is folded into the prediction
-     * correctly. If the move subsequently fails the distance check and
-     * {@code possibleCoastToStop} is set, this field is ignored on the retry pass
-     * so that {@link HiddenMotionReconstructor#simulateStoppingMotion}
-     * can model the re-acceleration from a true zero-velocity state instead.</p>
-     *
-     * <p>Reset to {@code 0.0} whenever it is consumed or when the move is deemed to
-     * not require correction.</p>
+     * Used as the starting horizontal momentum on the next tick (replaces the
+     * usual lastMove.xDistance). Set to 0.0 after it is applied or when not
+     * needed.
      */
     public double xCorrectedDistancePre;
 
@@ -161,19 +170,24 @@ public class PlayerMoveData extends MoveData {
     public double yCorrectedDistancePre;
     
     /**
-     * Mirror of {@link #xCorrectedDistancePre} for the Z axis.
+     * Corrected Z displacement computed for the previous move by the
+     * hidden-tick reconstructor. Applied the same way as
+     * {@link #xCorrectedDistancePre} but for the Z axis.
      */
     public double zCorrectedDistancePre;
     
     /**
-     * Additive motion for the end of next move to use. Borrow and return effect. <br>
-     * There are 2 sources of this: hidden move(stop motion) and ground riptide.
+     * Post-correction X displacement. When a hidden candidate exists but the
+     * observed move has zero displacement (or similar cases), the reconstructor
+     * result can be stored here and added to theoretical candidate distances in
+     * the next calculations. This is a temporary holder and is cleared when
+     * consumed.
      */
-    // TODO: Use this to handle ground riptide, cleaner code
     public double xCorrectedDistancePost;
     
     /**
-     * Mirror of {@link #xCorrectedDistancePost} for the Z axis.
+     * Post-correction Z displacement. Works like {@link #xCorrectedDistancePost}
+     * but for the Z axis.
      */
     public double zCorrectedDistancePost;
 

@@ -840,11 +840,11 @@ public class SurvivalFly extends Check {
         // TODO: Get rid of this config option. Why would someone want to disable piston push detection and cause false positives?
         if (cc.trackBlockMove) {
             if (from.matchBlockChange(blockChangeTracker, data.blockChangeRef, thisMove.xDistance < 0.0 ? Direction.X_NEG : Direction.X_POS, 0.05)) {
-                tags.add("blkmove_x");
+                tags.add("blkmv_x");
                 xPush = true;
             }
             if (from.matchBlockChange(blockChangeTracker, data.blockChangeRef, thisMove.zDistance < 0.0 ? Direction.Z_NEG : Direction.Z_POS, 0.05)) {
-                tags.add("blkmove_z");
+                tags.add("blkmv_z");
                 zPush = true;
             }
             if (xPush && zPush) {
@@ -1348,6 +1348,14 @@ public class SurvivalFly extends Check {
         boolean strict = cc.survivalFlyStrictHorizontal;
         final double hiddenThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
         for (i = 0; i < 9; i++) {
+            // If this theoretical candidate results in a post-collision horizontal
+            // displacement smaller than the client's packet-suppression threshold,
+            // it means that the client may have omitted (suppressed) the intermediate
+            // packet(s) for this motion. Record the WASD candidate index so it can
+            // be used as a seed for the hidden-tick reconstructor.
+            // Note: if multiple candidates match, the last matching index will
+            // overwrite earlier ones (thisMove.hiddenDistanceIndex holds only one
+            // seed candidate).
             if (!collideX[i] && !collideZ[i] && thisMove.yDistance < hiddenThreshold
                 && MathUtil.dist(xTheoreticalDistance[i], zTheoreticalDistance[i]) < hiddenThreshold) {
                 thisMove.hiddenDistanceIndex = i;
@@ -1399,6 +1407,14 @@ public class SurvivalFly extends Check {
             }
         }
         if (!found) {
+            // If we couldn't find a direct match for the observed movement, but
+            // we previously recorded a candidate that would have been suppressed
+            // by the client (hiddenDistanceIndex), attempt to reconstruct the
+            // missing intermediate ticks. The reconstructor is seeded with the
+            // selected WASD candidate and its post-collision displacement and
+            // will return cumulative displacements for the hidden ticks. Those
+            // results are then folded into the theoretical distances or stored
+            // in the "corrected distance" fields for use across ticks.
             if (thisMove.hiddenDistanceIndex != -1) {
                 final double result[] = HiddenMotionReconstructor.findBestHiddenTickExplanation(sinYaw, cosYaw, movementSpeed, theorInputs[thisMove.hiddenDistanceIndex], xTheoreticalDistance[thisMove.hiddenDistanceIndex], zTheoreticalDistance[thisMove.hiddenDistanceIndex], data, pData, from, pData.isInCrouchingPose(), attributeAccess.getHandle().getPlayerSneakingFactor(player), BridgeMisc.isSlowedDownByUsingAnItem(player), onGround, xTheoreticalDistance[thisMove.hiddenDistanceIndex], zTheoreticalDistance[thisMove.hiddenDistanceIndex]);
                 if (thisMove.xDistance == 0 && thisMove.zDistance == 0) {
@@ -1941,7 +1957,7 @@ public class SurvivalFly extends Check {
             }
             if (!found && thisMove.hiddenYDistanceIndex != -1) {
                 final double result[] = HiddenMotionReconstructor.findBestHiddenTickExplanation(yTheoreticalDistance[thisMove.hiddenYDistanceIndex], player, data, cData, pData, from, to, attributeAccess.getHandle().getJumpGainMultiplier(player), 
-                        verticalLiquidPushComponent, onGround, yTheoreticalDistance[thisMove.hiddenYDistanceIndex]);
+                                                                                                verticalLiquidPushComponent, onGround, yTheoreticalDistance[thisMove.hiddenYDistanceIndex]);
                 yTheoreticalDistance[thisMove.hiddenYDistanceIndex] += result[0];
                 if (MathUtil.isOffsetWithinPredictionEpsilon(thisMove.yDistance, yTheoreticalDistance[thisMove.hiddenYDistanceIndex])) {
                     thisMove.yAllowedDistance = yTheoreticalDistance[thisMove.hiddenYDistanceIndex];

@@ -908,7 +908,7 @@ public class CollisionUtil {
         // To achive this, first, need to change collision system to flag passable block(complicated), 
         // second add flag F_INTERACT_PASSABLE to ignore block can truly passable, 
         // third add bounds to BlockCacheBukkit.java
-        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE)) != 0) {
+        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE_CHECK)) != 0) {
             return true;
         }
 
@@ -985,25 +985,25 @@ public class CollisionUtil {
      * 
      * @param blockCache The block cache.
      * @param entity The entity whose bounding box is being checked for collisions.
-     * @param AABB The axis-aligned bounding box (AABB) of the entity.
+     * @param entityAABB The axis-aligned bounding box (AABB) of the entity.
      * @param collisionBoxes A {@link List} to store collision boxes (ignored if {@code onlyCheckCollide} is true).
      * @param onlyCheckCollide If true, only checks for collisions and returns immediately if a collision is detected. 
      *                         If false, collects collision boxes for further processing.
      *
      * @return {@code true} if a collision is detected in check-only mode or if a world border collision occurs; otherwise, {@code false}.
      */
-    public static boolean getCollisionBoxes(BlockCache blockCache, Entity entity, double[] AABB, List<double[]> collisionBoxes, boolean onlyCheckCollide) {
-        boolean collided = addWorldBorder(entity, AABB, collisionBoxes, onlyCheckCollide);
+    public static boolean getCollisionBoxes(BlockCache blockCache, Entity entity, double[] entityAABB, List<double[]> collisionBoxes, boolean onlyCheckCollide) {
+        boolean collided = addWorldBorder(entity, entityAABB, collisionBoxes, onlyCheckCollide);
         if (onlyCheckCollide && collided) {
             // Already collided with the world border, return.
             return true;
         }
-        int minBlockX = (int) Math.floor(AABB[0] - COLLISION_EPSILON) - 1;
-        int maxBlockX = (int) Math.floor(AABB[3] + COLLISION_EPSILON) + 1;
-        int minBlockY = (int) Math.floor(AABB[1] - COLLISION_EPSILON) - 1;
-        int maxBlockY = (int) Math.floor(AABB[4] + COLLISION_EPSILON) + 1;
-        int minBlockZ = (int) Math.floor(AABB[2] - COLLISION_EPSILON) - 1;
-        int maxBlockZ = (int) Math.floor(AABB[5] + COLLISION_EPSILON) + 1;
+        int minBlockX = (int) Math.floor(entityAABB[0] - COLLISION_EPSILON) - 1;
+        int maxBlockX = (int) Math.floor(entityAABB[3] + COLLISION_EPSILON) + 1;
+        int minBlockY = (int) Math.floor(entityAABB[1] - COLLISION_EPSILON) - 1;
+        int maxBlockY = (int) Math.floor(entityAABB[4] + COLLISION_EPSILON) + 1;
+        int minBlockZ = (int) Math.floor(entityAABB[2] - COLLISION_EPSILON) - 1;
+        int maxBlockZ = (int) Math.floor(entityAABB[5] + COLLISION_EPSILON) + 1;
         for (int y = minBlockY; y < maxBlockY; y++) {
             for (int x = minBlockX; x <= maxBlockX; x++) {
                 for (int z = minBlockZ; z <= maxBlockZ; z++) {
@@ -1025,7 +1025,7 @@ public class CollisionUtil {
                                 collisionBoxes.addAll(AxisAlignedBBUtils.splitIntoSingle(multiAABB));
                             }
                         } 
-                        else if (AxisAlignedBBUtils.isCollided(blockCache.getBounds(x, y, z), x, y, z, AABB, true)) {
+                        else if (AxisAlignedBBUtils.isCollided(blockCache.getBounds(x, y, z), x, y, z, entityAABB, true)) {
                             return true;
                         }
                     }

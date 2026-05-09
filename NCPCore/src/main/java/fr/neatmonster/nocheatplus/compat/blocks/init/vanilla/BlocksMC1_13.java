@@ -68,7 +68,7 @@ public class BlocksMC1_13 implements BlockPropertiesSetup {
         for (Material mat : MaterialUtil.DEAD_CORAL_PARTS) {
             // (Flags should be set correctly by default.)
             BlockProperties.setBlockProps(mat, BlockProperties.instantType);
-            BlockFlags.setBlockFlags(mat, BlockFlags.F_IGN_PASSABLE);
+            BlockFlags.setBlockFlags(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
         }
 
         // Water plants

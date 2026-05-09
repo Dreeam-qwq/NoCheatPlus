@@ -41,7 +41,7 @@ public class MCAccessBukkit extends MCAccessBukkitBase implements BlockPropertie
             }
             else if (guessItchyBlock(mat)) {
                 // Uncertain bounding-box, allow passing through.
-                long flags = BlockFlags.F_IGN_PASSABLE;
+                long flags = BlockFlags.F_IGN_PASSABLE_CHECK;
                 if ((BlockFlags.hasAnyFlag(flags, BlockFlags.SOLID_GROUND))) {
                     // Block can be ground, so allow standing on any height.
                     flags |= BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT;

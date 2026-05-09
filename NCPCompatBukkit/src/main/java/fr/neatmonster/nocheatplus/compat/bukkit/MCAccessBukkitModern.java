@@ -499,6 +499,10 @@ public class MCAccessBukkitModern extends MCAccessBukkit {
         // Dripstone.      
         mt = BridgeMaterial.getBlock("pointed_dripstone");
         if (mt != null) addModel(mt, MODEL_POINTED_DRIPSTONE);
+        
+        // Sulfur spike
+        mt = BridgeMaterial.getBlock("sulfur_spike");
+        if (mt != null) addModel(mt, MODEL_POINTED_DRIPSTONE);
 
         // Bell.
         mt = BridgeMaterial.getBlock("bell");

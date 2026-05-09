@@ -790,6 +790,15 @@ public class HiddenMotionReconstructor {
      * @param totalX          accumulated reconstructed X displacement so far (usually 0 at entry)
      * @param totalZ          accumulated reconstructed Z displacement so far (usually 0 at entry)
      * @return a four-element array {@code [cumulativeDeltaX, cumulativeDeltaZ, residualErrX, residualErrZ]}
+     *
+     * <p>Called by {@code SurvivalFly} when a WASD candidate (selected via
+     * {@code hiddenDistanceIndex}) produced a post-collision displacement small
+     * enough to be suppressed by the client. The selected candidate is passed
+     * as the depth-0 seed and the reconstructor searches for sequences of
+     * hidden ticks that, when simulated, explain the observed movement. The
+     * returned array contains cumulative delta X/Z and the residual error
+     * compared to the observed position.</p>
+     *
      */
     public static double[] findBestHiddenTickExplanation(float sinYaw, float cosYaw, float movementspeed, PlayerKeyboardInput input,
                                                          final double xDistance, final double zDistance, final MovingData data, final IPlayerData pData, final PlayerLocation from,

@@ -162,7 +162,13 @@ public class MaterialUtil {
     public static final Set<Material> ALL_DOORS = Collections.unmodifiableSet(BridgeMaterial.getByPrefixAndSuffix(null, Arrays.asList("_door"), AlmostBoolean.YES, "trap", "legacy"));
 
     public static final Set<Material> COPPER_BLOCKS = Collections.unmodifiableSet(addBlocks(BridgeMaterial.getBySuffix("_copper", AlmostBoolean.YES), "copper_block", "waxed_copper_block"));
-
+    
+    /** Includes everything: walls, stairs, slabs, brick variants etc... Used for setting block proprierties, which are all the same */
+    public static final Set<Material> CINNABAR_BLOCKS = Collections.unmodifiableSet(BridgeMaterial.getByContains(AlmostBoolean.YES, Arrays.asList("cinnabar"), "legacy"));
+    
+    /** Includes everything: walls, stairs, slabs, brick variants etc... Used for setting block proprierties, which are all the same. Sulfur spikes are excluded */
+    public static final Set<Material> SULFUR_BLOCKS = Collections.unmodifiableSet(BridgeMaterial.getByContains(AlmostBoolean.YES, Arrays.asList("sulfur"), "legacy", "sulfur_spike"));
+    
     public static final Set<Material> ALL_REFINED_COPPER_BLOCKS = Collections.unmodifiableSet(BridgeMaterial.getByContains(AlmostBoolean.YES, Arrays.asList("copper"), "ore", "raw"));
 
     public static final Set<Material> COPPER_BULBS = Collections.unmodifiableSet(BridgeMaterial.getBySuffix("copper_bulb", AlmostBoolean.YES));
@@ -301,12 +307,10 @@ public class MaterialUtil {
                     ));
 
     /** Blocks that are infested with silverfish. */
-    public static final Set<Material> INFESTED_BLOCKS = Collections.unmodifiableSet(addBlocks(
-            BridgeMaterial.getByPrefix("infested_", AlmostBoolean.YES), "monster_eggs"));
+    public static final Set<Material> INFESTED_BLOCKS = Collections.unmodifiableSet(addBlocks(BridgeMaterial.getByPrefix("infested_", AlmostBoolean.YES), "monster_eggs"));
 
     /** All lava blocks. */
-    public static final Set<Material> LAVA = Collections.unmodifiableSet(
-            BridgeMaterial.getAllBlocks("lava", "stationary_lava"));
+    public static final Set<Material> LAVA = Collections.unmodifiableSet(BridgeMaterial.getAllBlocks("lava", "stationary_lava"));
 
     public static final Set<Material> LEAVES = Collections.unmodifiableSet(addBlocks(
             BridgeMaterial.getByPrefixAndSuffix(
@@ -560,7 +564,7 @@ public class MaterialUtil {
      * full bounds - not necessarily 'solid' officially).
      */
     @SuppressWarnings("unchecked")
-    public static final Set<Material> FULLY_SOLID_BLOCKS = Collections.unmodifiableSet(join(
+    public static final Set<Material> FUll_BOUNDS_AND_SOLID = Collections.unmodifiableSet(join(
             CONCRETE_BLOCKS,
             CONCRETE_POWDER_BLOCKS,
             CORAL_BLOCKS,

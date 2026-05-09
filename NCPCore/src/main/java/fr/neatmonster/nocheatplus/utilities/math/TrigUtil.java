@@ -818,6 +818,7 @@ public class TrigUtil {
     /**
      * Check if the x-z plane move is "any backwards" regarding the yaw
      * direction.
+     * Highly inaccurate and susceptible to high speed and fast looking direction changes/switches.
      *
      * @param xDistance
      *            the x distance
@@ -1017,19 +1018,7 @@ public class TrigUtil {
     public static boolean isSameBlock(final int x1, final int y1, final int z1, final double x2, final double y2, final double z2) {
         return x1 == Location.locToBlock(x2) && z1 == Location.locToBlock(z2) && y1 == Location.locToBlock(y2);
     }
-
-    /**
-     * Check if the block has the same coordinates.
-     * 
-     * @param x
-     * @param y
-     * @param z
-     * @param block
-     * @return
-     */
-    public static boolean isSameBlock(int x, int y, int z, Block block) {
-        return x == block.getX() && y == block.getY() && z == block.getZ();
-    }
+    
 
     public static double distanceSquared(Vector vector) {
         return vector.getX() * vector.getX() + vector.getZ() * vector.getZ();

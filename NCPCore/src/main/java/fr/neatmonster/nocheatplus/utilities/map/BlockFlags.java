@@ -37,7 +37,7 @@ import fr.neatmonster.nocheatplus.utilities.map.BlockCache.IBlockCacheNode;
 public class BlockFlags {
 
     /** The Constant blockFlags. */
-    protected static final Map<Material, Long> blockFlags = new HashMap<Material, Long>();
+    protected static final Map<Material, Long> flags = new HashMap<Material, Long>();
 
     /** Map flag to names. */
     static final Map<Long, String> flagNameMap = new LinkedHashMap<Long, String>();
@@ -73,11 +73,14 @@ public class BlockFlags {
     /** Minecraft isSolid result. Used for setting ground flag - Subject to change / rename. */
     public static final long F_SOLID                        = f_flag();
 
-    /** Compatibility flag: regard this block as passable always.<br>
-     * NOTE: Extremely cautious when assign with F_GROUND. They can conflict each others causing random bugs
+    /** 
+     * Compatibility flag: regard this block as passable, thus, ignored by the Moving_Passable check.<br>
+     * NOTE: Be extremely cautious when assigning this flag to a block that already has the GROUND flag. 
+     * A ground-like block cannot be passable by definition; assigning this flag to such a block will cause conflicts, causing random bugs and issues with movement checks.
      * NOTE: With the differentiation of visual/interaction boxes from collision boxes, this flag needs to be replaced or removed to avoid ambiguity.
-     * */
-    public static final long F_IGN_PASSABLE                 = f_flag();
+     */
+    @Deprecated
+    public static final long F_IGN_PASSABLE_CHECK = f_flag();
 
     /** Like water. */
     public static final long F_WATER                        = f_flag();
@@ -90,29 +93,29 @@ public class BlockFlags {
      */
     public static final long F_HEIGHT150                    = f_flag();
 
-    /** The player can stand on these, sneaking or not. */
+    /** The player can stand on this block due to it having a collision box. TODO: Rename to HAS_COLLISION_BOX? */
     public static final long F_GROUND                       = f_flag(); 
 
     /** 
      * Override bounding box: 1 block height.<br>
-     * NOTE: This should later be ignored by passable, rather.
+     * NOTE: This should later be ignored by passable, rather. TODO: Why the fuck would this be ignored by Passable??
      */
     public static final long F_HEIGHT100                    = f_flag();
 
-    /** Climbable like ladder and vine (allow to land on without taking damage). */
+    /** A block with this flag will have climbable properties applied to it. */
     public static final long F_CLIMBABLE                    = f_flag();
 
-    /** Can actually climb up (like vines, which didn't use to). */
+    /** This block can be climbed up. Only relevant for legacy vines, which needed to be attached to a solid block to tbe climbed up  */
     public static final long F_CLIMBUPABLE                  = f_flag();
 
     /** 
      * The block can change shape. This is most likely not 100% accurate...<br>
-     * Tell NCP that you can jump in the block!<br>
-     * More likely to indicate block change shape when stacking up
+     * Signal to NCP that an entity may be able to jump inside this block.  
+     * More likely to indicate block change shape when stacking up; 
      */
     public static final long F_VARIABLE                     = f_flag();
 
-    /** Block has full xz-bounds. */
+    /** Block is 1-block wide. */
     public static final long F_XZ100                        = f_flag();
 
     /**
@@ -135,7 +138,7 @@ public class BlockFlags {
     public static final long F_GROUND_HEIGHT                = f_flag();
 
     /** 
-     * The height is assumed to decrease from 1.0 with increasing data value from 0 to 0x7, with 0x7 being the lowest.
+     * The height is assumed to decrease from 1.0 height with increasing data value from 0 to 0x7, with 0x7 being the lowest.
      * (repeating till 0x15)). 0x8 means falling/full block. This is meant to model flowing water/lava. <br>
      * However the hit-box for collision checks  will be set to 0.5 height or 1.0 height only.
      */
@@ -167,14 +170,11 @@ public class BlockFlags {
 
     /** Thick fences: actual fences. */
     public static final long F_THICK_FENCE                  = f_flag();
-
-    /** Walls */
-    public static final long F_WALL                         = f_flag();
     
     /** Fence gate style with 0x04 being fully passable. */
     public static final long F_PASSABLE_X4                  = f_flag();
 
-    /** Like slime block: bounce back 25% of fall height without taking fall damage [TODO: Check/adjust]. */
+    /** Like slime block: bounce back 25% of fall height without taking fall damage [TODO: Check/adjust/rename]. */
     public static final long F_BOUNCE25                     = f_flag();
     
     /** Like the honey block: fall damage is / 5 when landing on this block. Also allows player to stick to its sides with slower falling speed. */
@@ -270,7 +270,7 @@ public class BlockFlags {
             }
         } 
         catch (Exception e) {}
-        blockFlags.put(material, blockFlags.get(material) | addFlag);
+        flags.put(material, flags.get(material) | addFlag);
     }
 
     public static void maskFlag(Material material, long addFlag) {
@@ -281,7 +281,7 @@ public class BlockFlags {
             }
         } 
         catch (Exception e) {}
-        blockFlags.put(material, blockFlags.get(material) & addFlag);
+        flags.put(material, flags.get(material) & addFlag);
     }
 
     /**
@@ -368,7 +368,7 @@ public class BlockFlags {
      * @return the block flags
      */
     public static final long getBlockFlags(final Material mat) {
-        return blockFlags.containsKey(mat) ? blockFlags.get(mat) : 0;
+        return flags.containsKey(mat) ? flags.get(mat) : 0;
     }
 
     /**
@@ -398,7 +398,7 @@ public class BlockFlags {
             }
         } 
         catch (Exception e) {}
-        blockFlags.put(material, flags);
+        BlockFlags.flags.put(material, flags);
     }
 
     /**

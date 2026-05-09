@@ -14,13 +14,19 @@
  */
 package fr.neatmonster.nocheatplus.compat.blocks.init.vanilla;
 
+import org.bukkit.Material;
+
 import fr.neatmonster.nocheatplus.compat.blocks.BlockPropertiesSetup;
 import fr.neatmonster.nocheatplus.compat.blocks.init.BlockInit;
+import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.config.ConfPaths;
 import fr.neatmonster.nocheatplus.config.ConfigFile;
 import fr.neatmonster.nocheatplus.config.ConfigManager;
 import fr.neatmonster.nocheatplus.config.WorldConfigProvider;
 import fr.neatmonster.nocheatplus.logging.StaticLog;
+import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
+import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
+import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 
 
 public class BlocksMC26 implements BlockPropertiesSetup {
@@ -32,6 +38,18 @@ public class BlocksMC26 implements BlockPropertiesSetup {
     public void setupBlockProperties(WorldConfigProvider<?> worldConfigProvider) {
         ConfigFile config = ConfigManager.getConfigFile();
         // GOLDEN_DANDELION is set already set within MaterialUtil#Instant_Plants.
+        if (ServerVersion.isAtLeast("26.2")) {
+            for (Material mat : MaterialUtil.CINNABAR_BLOCKS) {
+                BlockProperties.setBlockProps(mat, new BlockProperties.BlockProps(BlockProperties.woodPickaxe, 1.5f, true));
+                BlockFlags.addFlags(mat, BlockFlags.SOLID_GROUND);
+            }
+            for (Material mat : MaterialUtil.SULFUR_BLOCKS) {
+                BlockProperties.setBlockProps(mat, new BlockProperties.BlockProps(BlockProperties.woodPickaxe, 1.5f, true));
+                BlockFlags.addFlags(mat, BlockFlags.SOLID_GROUND);
+            }
+            BlockFlags.addFlags("SULFUR_SPIKE", BlockFlags.SOLID_GROUND | BlockFlags.F_VARIABLE);
+            BlockProperties.setBlockProps("SULFUR_SPIKE", new BlockProperties.BlockProps(BlockProperties.woodPickaxe, 1.5f));
+        }
         if (config.getBoolean(ConfPaths.BLOCKBREAK_DEBUG, config.getBoolean(ConfPaths.CHECKS_DEBUG, false)))
             StaticLog.logInfo("Added block-info for Minecraft 26 blocks.");
     }

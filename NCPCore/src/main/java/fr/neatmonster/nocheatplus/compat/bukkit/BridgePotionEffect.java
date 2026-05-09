@@ -18,6 +18,9 @@ import org.bukkit.potion.PotionEffectType;
 
 import fr.neatmonster.nocheatplus.utilities.StringUtil;
 
+/**
+ * Utility class for handling PotionEffectType compatibility across different Bukkit versions.
+ */
 public class BridgePotionEffect {
     
     /**
@@ -27,7 +30,7 @@ public class BridgePotionEffect {
      * @return The corresponding PotionEffectType, or null if not found.
      */
     @SuppressWarnings("deprecation")
-    private static final PotionEffectType parsePotionEffect(final String name) {
+    private static PotionEffectType parsePotionEffect(final String name) {
         try {
             return PotionEffectType.getByName(name);
         } catch (Exception e) {

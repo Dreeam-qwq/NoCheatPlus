@@ -246,7 +246,7 @@ public class BlockProperties {
         public final boolean pureHardness;
 
         /**
-         * Instantiates a new block props.
+         * Instantiates a new block props that can be harvested by hand.
          *
          * @param tool
          *            The tool type that allows access to breaking times other
@@ -259,7 +259,7 @@ public class BlockProperties {
         }
 
         /**
-         * Instantiates a new block props.
+         * Instantiates a new block props, indicating whether it can be harvested by hand or not.
          *
          * @param tool
          *            The tool type that allows access to breaking times other
@@ -283,19 +283,19 @@ public class BlockProperties {
          *            the hardness
          * @param efficiencyMod
          *            the efficiency mod
-         * @param requireCorrectTool
+         * @param requireCorrectToolToLoot
          *            false if block can be collected using bare hand to mine and vice versa
          */
-        public BlockProps(ToolProps tool, float hardness, float efficiencyMod, boolean requireCorrectTool) {
+        public BlockProps(ToolProps tool, float hardness, float efficiencyMod, boolean requireCorrectToolToLoot) {
             pureHardness = true;
             this.tool = tool;
             this.hardness = hardness;
-            this.requireCorrectTool = requireCorrectTool;
+            this.requireCorrectTool = requireCorrectToolToLoot;
             breakingTimes = new long[7];
             breakingTimes[0] = (long) (1000f * 5f * hardness);
             boolean noTool = tool.materialBase == null || tool.toolType == null || tool.toolType == ToolType.NONE;//|| tool.materialBase == MaterialBase.NONE;
 
-            if (noTool || !requireCorrectTool) {
+            if (noTool || !requireCorrectToolToLoot) {
                 breakingTimes[0] *= 0.3;
             }
 
@@ -1141,9 +1141,6 @@ public class BlockProperties {
         return (BlockFlags.getBlockFlags(mat) & BlockFlags.F_WATER_PLANT) != 0;
     }
 
-    public static final boolean isDoor(final Material mat) {
-        return MaterialUtil.ALL_DOORS.contains(mat);
-    }
 
     /** Liquid height if no solid/full blocks are above. */
     public static final double LIQUID_HEIGHT_LOWERED = 8 / 9f;
@@ -1439,9 +1436,10 @@ public class BlockProperties {
         //////////////////////////////////////////////////////
         // Generic initialization.
         for (Material mat : Material.values()) {
-            BlockFlags.blockFlags.put(mat, 0L);
+            BlockFlags.flags.put(mat, 0L);
             if (mcAccess.isBlockLiquid(mat).decide()) {
                 // TODO: do not set BlockFlags.F_GROUND for liquids ?
+                // Why the fuck would a liquid block return isSolid = true??
                 BlockFlags.setFlag(mat, BlockFlags.F_LIQUID);
                 if (mcAccess.isBlockSolid(mat).decide()) BlockFlags.setFlag(mat, BlockFlags.F_SOLID);
             }
@@ -1453,18 +1451,16 @@ public class BlockProperties {
         BlockProps props;
 
         // Stairs.
-        final long stairFlags = BlockFlags.F_STAIRS | BlockFlags.F_GROUND | BlockFlags.F_SOLID;
         for (final Material mat : MaterialUtil.ALL_STAIRS) {
-            BlockFlags.setFlag(mat, stairFlags);
+            BlockFlags.setFlag(mat, BlockFlags.F_STAIRS | BlockFlags.F_GROUND | BlockFlags.F_SOLID);
         }
 
         // Step (ground + full width).
-        final long stepFlags = BlockFlags.F_GROUND | BlockFlags.F_XZ100;
         for (final Material mat : new Material[]{BridgeMaterial.STONE_SLAB,}) {
-            BlockFlags.setFlag(mat, stepFlags);
+            BlockFlags.setFlag(mat, BlockFlags.F_GROUND | BlockFlags.F_XZ100);
         }
         for (final Material mat : MaterialUtil.SLABS) {
-            BlockFlags.setFlag(mat, stepFlags);
+            BlockFlags.setFlag(mat, BlockFlags.F_GROUND | BlockFlags.F_XZ100);
         }
 
         // Rails
@@ -1473,11 +1469,13 @@ public class BlockProperties {
         }
 
         // Water
+        // TODO: Is the modeling flag needed now that we have a modeling class?
         for (final Material mat : MaterialUtil.WATER) {
             BlockFlags.setFlag(mat, BlockFlags.F_LIQUID | BlockFlags.F_HEIGHT_8SIM_DEC | BlockFlags.F_WATER);
         }
 
         // Lava
+        // TODO: Is the modeling flag needed now that we have a modeling class?
         for (final Material mat : MaterialUtil.LAVA) {
             BlockFlags.setFlag(mat, BlockFlags.F_LIQUID | BlockFlags.F_LAVA | BlockFlags.F_HEIGHT_8SIM_DEC); // Minecraft 1.13 will remove this flag.
         }
@@ -1491,7 +1489,7 @@ public class BlockProperties {
         // Ground (can stand on).
         for (final Material mat : new Material[]{
             Material.COCOA, 
-            Material.SNOW, 
+            Material.SNOW, // TODO: The first layer of snow is not ground!
             Material.LADDER,
             Material.BREWING_STAND,
             BridgeMaterial.get("DIODE_BLOCK_OFF"), 
@@ -1501,16 +1499,17 @@ public class BlockProperties {
             BridgeMaterial.LILY_PAD, 
             BridgeMaterial.PISTON_HEAD,
             BridgeMaterial.STONE_SLAB,
-            BridgeMaterial.REPEATER}) {
+            BridgeMaterial.REPEATER}) { // TODO: Why is a repeater ground?? Does it have a collision box?
             if (mat != null) BlockFlags.setFlag(mat, BlockFlags.F_GROUND);
         }
         
         // Moving piston
         setBlockProps(BridgeMaterial.MOVING_PISTON, indestructibleType); // TODO: really?
-        BlockFlags.setFlag(BridgeMaterial.MOVING_PISTON, BlockFlags.F_IGN_PASSABLE | BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT | BlockFlags.FULL_BOUNDS);
+        BlockFlags.setFlag(BridgeMaterial.MOVING_PISTON, BlockFlags.F_IGN_PASSABLE_CHECK | BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT | BlockFlags.FULL_BOUNDS);
 
         // Full block height.
         // Server reports the visible shape 0.9375, client moves on full block height.
+        // TODO: is this needed with the modeling?
         for (final Material mat : new Material[]{BridgeMaterial.FARMLAND}) {
             BlockFlags.setFlag(mat, BlockFlags.F_HEIGHT100);
         }
@@ -1521,7 +1520,7 @@ public class BlockProperties {
         // Ignore for passable.
         for (final Material mat : new Material[] {
             // More strictly needed.
-            // Plates are passable? ...
+            // TODO: Plates are passable? ...
             // ^ They are not, this is part of a workaround
             //@See: https://github.com/Updated-NoCheatPlus/NoCheatPlus/commit/e377abe3427a6f971185fdb9ba2024c1f7803141
             BridgeMaterial.STONE_PRESSURE_PLATE, 
@@ -1529,12 +1528,12 @@ public class BlockProperties {
             BridgeMaterial.SIGN,
             BridgeMaterial.get("DIODE_BLOCK_ON"), 
             BridgeMaterial.get("DIODE_BLOCK_OFF"),}) {
-            if (mat != null) BlockFlags.setFlag(mat, BlockFlags.F_IGN_PASSABLE);
+            if (mat != null) BlockFlags.setFlag(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
         }
 
         // 1.5 high blocks (fences, walls, gates)
         final long flags150 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE | BlockFlags.F_THICK_FENCE;
-        final long flags1502 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE | BlockFlags.F_WALL;
+        final long flags1502 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE;
         BlockFlags.setFlag(BridgeMaterial.COBBLESTONE_WALL, flags1502);
         for (final Material mat : new Material[]{BridgeMaterial.NETHER_BRICK_FENCE}) {
             BlockFlags.setFlag(mat, flags150);
@@ -1558,7 +1557,6 @@ public class BlockProperties {
         // Blocks that vary with redstone or interaction.
         for (Material material : Material.values()) {
             if (material.isBlock()) {
-                
                 final String name = material.name().toLowerCase();
                 if (name.endsWith("_door") 
                     || name.endsWith("_trapdoor")
@@ -1604,7 +1602,7 @@ public class BlockProperties {
         BlockFlags.setFlag(BridgeMaterial.END_PORTAL_FRAME, BlockFlags.SOLID_GROUND);
 
         // Cobweb
-        BlockFlags.setFlag(BridgeMaterial.COBWEB, BlockFlags.F_COBWEB | BlockFlags.FULL_BOUNDS | BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setFlag(BridgeMaterial.COBWEB, BlockFlags.F_COBWEB | BlockFlags.FULL_BOUNDS | BlockFlags.F_IGN_PASSABLE_CHECK);
 
         // Soulsand
         BlockFlags.setFlag(Material.SOUL_SAND, BlockFlags.F_SOULSAND | BlockFlags.SOLID_GROUND);
@@ -1687,7 +1685,7 @@ public class BlockProperties {
             Material.FIRE,}) {
             if (mat != null) {
                 setBlock(mat, instantType);
-                BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE);
+                BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
             }
         }
 
@@ -2006,13 +2004,13 @@ public class BlockProperties {
         }
 
         // Fully solid blocks (shape / passable) - simplifies MCAccessBukkit setup, aim at 1.13+.
-        for (Material mat : MaterialUtil.FULLY_SOLID_BLOCKS) {
+        for (Material mat : MaterialUtil.FUll_BOUNDS_AND_SOLID) {
             BlockFlags.addFlags(mat, BlockFlags.FULL_BOUNDS | BlockFlags.F_SOLID);
         }
 
         // Fully passable blocks.
         for (Material mat : MaterialUtil.NO_COLLISION_BOX) {
-            BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE);
+            BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
             BlockFlags.removeFlags(mat, BlockFlags.F_SOLID | BlockFlags.F_GROUND);
         }
     }
@@ -3031,7 +3029,7 @@ public class BlockProperties {
     public static final boolean isPassable(final Material blockType) {
         final long flags = BlockFlags.getBlockFlags(blockType);
         // TODO: What with non-solid blocks that are not passable ?
-        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE)) != 0) {
+        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE_CHECK)) != 0) {
             return true;
         }
         else {
@@ -4465,7 +4463,7 @@ public class BlockProperties {
         final Material aboveMat = nodeAbove.getType();
         final long aboveFlags = BlockFlags.getBlockFlags(aboveMat);
         // Block above has the IGNORE_PASSABLE flag, so we don't have to check it. (Note for above block check before ground property).
-        if ((aboveFlags & BlockFlags.F_IGN_PASSABLE) != 0) {
+        if ((aboveFlags & BlockFlags.F_IGN_PASSABLE_CHECK) != 0) {
             return AlmostBoolean.YES;
         }
         // Block above is liquid, not solid/ground, or set to not be considered as ground, skip here as well.

@@ -31,6 +31,10 @@ import fr.neatmonster.nocheatplus.compat.AlmostBoolean;
 import fr.neatmonster.nocheatplus.utilities.StringUtil;
 import fr.neatmonster.nocheatplus.utilities.ds.prefixtree.SimpleCharPrefixTree;
 
+/**
+ * Utility class for handling Bukkit Material instances in a version-agnostic way, 
+ * with support for legacy materials and flexible name-based lookups.
+ */
 public class BridgeMaterial {
     
     // TODO: Should be non static, ideally.
@@ -393,8 +397,7 @@ public class BridgeMaterial {
      * @param excludePrefixes optional prefixes to exclude
      * @return set of matching {@link Material} instances
      */
-    public static Set<Material> getBySuffix(final String suffix, 
-            final AlmostBoolean isBlock, final String... excludePrefixes) {
+    public static Set<Material> getBySuffix(final String suffix, final AlmostBoolean isBlock, final String... excludePrefixes) {
         final Set<Material> res = new LinkedHashSet<Material>();
         final SimpleCharPrefixTree prefixTree = new SimpleCharPrefixTree();
         prefixTree.feedAll(Arrays.asList(excludePrefixes), false, true);
@@ -412,8 +415,7 @@ public class BridgeMaterial {
      * @param excludePrefixes optional prefixes to exclude
      * @return set of matching {@link Material} instances
      */
-    public static Set<Material> getBySuffix(final Collection<String> suffices, 
-            final AlmostBoolean isBlock, final String... excludePrefixes) {
+    public static Set<Material> getBySuffix(final Collection<String> suffices, final AlmostBoolean isBlock, final String... excludePrefixes) {
         final Set<Material> res = new LinkedHashSet<Material>();
         final SimpleCharPrefixTree prefixTree = new SimpleCharPrefixTree();
         prefixTree.feedAll(Arrays.asList(excludePrefixes), false, true);

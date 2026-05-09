@@ -38,16 +38,16 @@ public class BlocksMC1_21 implements BlockPropertiesSetup {
     @Override
     public void setupBlockProperties(WorldConfigProvider<?> worldConfigProvider) {
         BlockProperties.setBlockProps("OPEN_EYEBLOSSOM", BlockProperties.instantType);
-        BlockFlags.setBlockFlags("OPEN_EYEBLOSSOM", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags("OPEN_EYEBLOSSOM", BlockFlags.F_IGN_PASSABLE_CHECK);
         
         BlockProperties.setBlockProps("CLOSED_EYEBLOSSOM", BlockProperties.instantType);
-        BlockFlags.setBlockFlags("CLOSED_EYEBLOSSOM", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags("CLOSED_EYEBLOSSOM", BlockFlags.F_IGN_PASSABLE_CHECK);
         
         BlockProperties.setBlockProps("PALE_HANGING_MOSS", BlockProperties.instantType);
-        BlockFlags.setBlockFlags("PALE_HANGING_MOSS", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags("PALE_HANGING_MOSS", BlockFlags.F_IGN_PASSABLE_CHECK);
         
         BlockProperties.setBlockProps("RESIN_CLUMP", BlockProperties.instantType);
-        BlockFlags.setBlockFlags("RESIN_CLUMP", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags("RESIN_CLUMP", BlockFlags.F_IGN_PASSABLE_CHECK);
         
         BlockInit.setAs("PALE_MOSS_BLOCK", Material.MOSS_BLOCK); // Uh oh, BridgeMaterial.MOSS here?
         
