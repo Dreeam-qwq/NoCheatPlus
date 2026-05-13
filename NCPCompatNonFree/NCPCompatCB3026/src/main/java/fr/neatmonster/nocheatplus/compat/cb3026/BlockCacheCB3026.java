@@ -172,5 +172,8 @@ public class BlockCacheCB3026 extends BlockCache {
         world = null;
         bukkitWorld = null;
     }
-
+    @Override
+    public long fetchExtendedData(int x, int y, int z) {
+        return 0;
+    }
 }

@@ -202,28 +202,29 @@ public class PlayerLocation extends RichEntityLocation {
             }
         }
         else {
-            double signumX = Math.signum(xDistance) * 0.05D;
-            double signumZ;
-            double[] offsetAABB_X = new double[]{minX + xDistance, minY + yBelow - 9.999999747378752E-6D, minZ, maxX + xDistance, minY, maxZ}; // Skip using maxY, as we do not care of the top of the box in this case.
-            for (signumZ = Math.signum(zDistance) * 0.05D; xDistance != 0.0D && CollisionUtil.isEmpty(blockCache, player, offsetAABB_X); xDistance -= signumX) {
+            final double signumX = Math.signum(xDistance) * 0.05D;
+            final double signumZ = Math.signum(zDistance) * 0.05D;
+            double[] offsetAABB_X = new double[]{minX + xDistance, minY + yBelow - 1.0E-5F, minZ, maxX + xDistance, minY, maxZ}; // Skip using maxY, as we do not care of the top of the box in this case.
+            while (xDistance != 0.0D && CollisionUtil.isEmpty(blockCache, player, offsetAABB_X)) {
                 if (Math.abs(xDistance) <= 0.05D) {
                     xDistance = 0.0D;
                     break;
                 }
-                offsetAABB_X = new double[]{minX + xDistance, minY + yBelow - 9.999999747378752E-6D, minZ, maxX + xDistance, minY, maxZ};
+                xDistance -= signumX;
+                offsetAABB_X = new double[]{minX + xDistance, minY + yBelow - 1.0E-5F, minZ, maxX + xDistance, minY, maxZ};
             }
             
-            double[] offsetAABB_Z = new double[]{minX, minY + yBelow - 9.999999747378752E-6D, minZ + zDistance, maxX, minY, maxZ + zDistance};
+            double[] offsetAABB_Z = new double[]{minX, minY + yBelow - 1.0E-5F, minZ + zDistance, maxX, minY, maxZ + zDistance};
             while (zDistance != 0.0D && CollisionUtil.isEmpty(blockCache, player, offsetAABB_Z)) {
                 if (Math.abs(zDistance) <= 0.05D) {
                     zDistance = 0.0D;
                     break;
                 }
                 zDistance -= signumZ;
-                offsetAABB_Z = new double[]{minX, minY + yBelow - 9.999999747378752E-6D, minZ + zDistance, maxX, minY, maxZ + zDistance};
+                offsetAABB_Z = new double[]{minX, minY + yBelow - 1.0E-5F, minZ + zDistance, maxX, minY, maxZ + zDistance};
             }
             
-            double[] offsetAABB_XZ = new double[]{minX + xDistance, minY + yBelow - 9.999999747378752E-6D, minZ + zDistance, maxX + xDistance, minY, maxZ + zDistance};
+            double[] offsetAABB_XZ = new double[]{minX + xDistance, minY + yBelow - 1.0E-5F, minZ + zDistance, maxX + xDistance, minY, maxZ + zDistance};
             while (xDistance != 0.0D && zDistance != 0.0D && CollisionUtil.isEmpty(blockCache, player, offsetAABB_XZ)) {
                 if (Math.abs(xDistance) <= 0.05D) {
                     xDistance = 0.0D;
@@ -234,7 +235,7 @@ public class PlayerLocation extends RichEntityLocation {
                     zDistance = 0.0D;
                 } 
                 else zDistance -= signumZ;
-                offsetAABB_XZ = new double[]{minX + xDistance, minY + yBelow - 9.999999747378752E-6D, minZ + zDistance, maxX + xDistance, minY, maxZ + zDistance};
+                offsetAABB_XZ = new double[]{minX + xDistance, minY + yBelow - 1.0E-5F, minZ + zDistance, maxX + xDistance, minY, maxZ + zDistance};
             }
         }
         vector = new Vector(xDistance, 0.0, zDistance);

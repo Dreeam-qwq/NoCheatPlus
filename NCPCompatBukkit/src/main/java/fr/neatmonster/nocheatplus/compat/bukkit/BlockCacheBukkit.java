@@ -118,4 +118,9 @@ public class BlockCacheBukkit extends BlockCache {
     public boolean isCollisionSameVisual(int x, int y, int z) {
         return true;
     }
+
+    @Override
+    public long fetchExtendedData(int x, int y, int z) {
+        return 0;
+    }
 }

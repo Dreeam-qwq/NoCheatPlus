@@ -2846,8 +2846,8 @@ public class BlockProperties {
         double liquidHeight;
         final IBlockCacheNode node = access.getOrCreateBlockCacheNode(x, y, z, false);
         final IBlockCacheNode nodeAbove = access.getOrCreateBlockCacheNode(x, y + 1, z, false);
-        final long flags = BlockFlags.getBlockFlags(node.getType());
-        final long aboveFlags = BlockFlags.getBlockFlags(nodeAbove.getType());
+        final long flags = BlockFlags.getBlockFlags(node.getType()) | access.getExtendedData(x, y, z);
+        final long aboveFlags = BlockFlags.getBlockFlags(nodeAbove.getType()) | access.getExtendedData(x, y + 1, z);
         if ((flags & liquidTypeFlag) != 0) {
             if (nodeAbove != null && (aboveFlags & liquidTypeFlag) != 0) {
                 // Same liquid type above, full block height
@@ -2859,7 +2859,7 @@ public class BlockProperties {
             }
             else {
                 // Level-dependant height otherwise
-                final int data = node.getData(access, x, y, z);
+                final int data = (flags & BlockFlags.F_WATERLOGGED) != 0 ? 0 : node.getData(access, x, y, z);
                 if (data >= 8) {
                     liquidHeight = LIQUID_HEIGHT_LOWERED;
                 }
@@ -3750,7 +3750,7 @@ public class BlockProperties {
         for (int x = iMinX; x < iMaxX; ++x) {
             for (int y = iMinY; y < iMaxY; ++y) {
                 for (int z = iMinZ; z < iMaxZ; ++z) {
-                    if ((BlockFlags.getBlockFlags(access.getType(x, y, z)) & liquidFlag) != 0) {
+                    if (((BlockFlags.getBlockFlags(access.getType(x, y, z)) | access.getExtendedData(x, y, z)) & liquidFlag) != 0) {
                         return true;
                     }
                 }
@@ -3863,61 +3863,6 @@ public class BlockProperties {
             for (int z = iMinZ; z <= iMaxZ; z++) {
                 for (int y = iMinY; y <= iMaxY; y++) {
                     if (mat == access.getType(x, y, z)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Check if the given bounding box collides with water logged blocks.
-     *
-     * @param world
-     *            the world
-     * @param access
-     *            the access
-     * @param minX
-     *            the min x
-     * @param minY
-     *            the min y
-     * @param minZ
-     *            the min z
-     * @param maxX
-     *            the max x
-     * @param maxY
-     *            the max y
-     * @param maxZ
-     *            the max z
-     * @return true, if successful
-     */
-    public static final boolean isWaterlogged(final World world, final BlockCache access, 
-                                              final double minX, final double minY, final double minZ, 
-                                              final double maxX, final double maxY, final double maxZ) {
-        if (!Bridge1_13.hasIsSwimming()) return false;
-        final int iMinX = Location.locToBlock(minX);
-        final int iMaxX = Location.locToBlock(maxX);
-        final int iMinY = Location.locToBlock(minY);
-        final int iMaxY = Math.min(Location.locToBlock(maxY), access.getMaxBlockY());
-        final int iMinZ = Location.locToBlock(minZ);
-        final int iMaxZ = Location.locToBlock(maxZ);
-
-        for (int x = iMinX; x <= iMaxX; x++) {
-            for (int z = iMinZ; z <= iMaxZ; z++) {
-                for (int y = iMaxY; y >= iMinY; y--) {
-                    BlockData bd = world.getBlockAt(x,y,z).getBlockData();
-                    if (bd instanceof Waterlogged && ((Waterlogged)bd).isWaterlogged()) {
-                        // Clearly outside of bounds. (liquid)
-                        if (minX > 1.0 + x || maxX < 0.0 + x
-                            || minY > LIQUID_HEIGHT_LOWERED + y || maxY < 0.0 + y
-                            || minZ > 1.0 + z || maxZ < 0.0 + z) {
-                            continue;
-                        }
-                        // Hitting the max-edges (if allowed).
-                        if (minX == 1.0 + x || minY == LIQUID_HEIGHT_LOWERED + y || minZ == 1.0 + z) {
-                            continue;
-                        }
                         return true;
                     }
                 }
@@ -4548,7 +4493,7 @@ public class BlockProperties {
         for (int x = iMinX; x <= iMaxX; x++) {
             for (int z = iMinZ; z <= iMaxZ; z++) {
                 for (int y = iMinY; y <= iMaxY; y++) {
-                    flags |= BlockFlags.getBlockFlags(access.getType(x, y, z));
+                    flags |= BlockFlags.getBlockFlags(access.getType(x, y, z)) | access.getExtendedData(x, y, z);
                 }
             }
         }

@@ -490,4 +490,9 @@ public class FakeBlockCache extends BlockCache {
         return true;
     }
 
+    @Override
+    public long fetchExtendedData(int x, int y, int z) {
+        return 0;
+    }
+
 }

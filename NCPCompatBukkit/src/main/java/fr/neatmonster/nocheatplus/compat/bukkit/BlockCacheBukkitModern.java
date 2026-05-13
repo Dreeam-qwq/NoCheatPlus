@@ -18,10 +18,15 @@ import java.util.Map;
 
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Waterlogged;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 
 import fr.neatmonster.nocheatplus.compat.bukkit.model.BukkitShapeModel;
+import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
+import fr.neatmonster.nocheatplus.players.IPlayerData;
+import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 
 
@@ -108,5 +113,18 @@ public class BlockCacheBukkitModern extends BlockCacheBukkit {
             // Ignore exceptions (Context: DisguiseCraft).
         }
         return false;
+    }
+
+    @Override
+    public long fetchExtendedData(int x, int y, int z) {
+        BlockData bd = world.getBlockAt(x, y, z).getBlockData();
+        if (bd instanceof Waterlogged && ((Waterlogged)bd).isWaterlogged()) {
+            final IPlayerData pData = getPlayerData();
+            if (pData != null) {
+                if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) return 0;
+            }
+            return BlockFlags.F_WATER | BlockFlags.F_LIQUID | BlockFlags.F_WATERLOGGED;
+        }
+        return 0;
     }
 }

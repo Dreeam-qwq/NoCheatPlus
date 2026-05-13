@@ -40,6 +40,8 @@ public abstract class BlockCache {
      *
      */
     public static interface IBlockCacheNode {
+        
+        public boolean isExtendedDataFetched();
 
         public boolean isDataFetched();
 
@@ -63,6 +65,8 @@ public abstract class BlockCache {
          */
         public Material getType();
 
+        public long getExtendedData();
+        
         /**
          * Ensure to test with isDataSet().
          * @return
@@ -123,7 +127,7 @@ public abstract class BlockCache {
          */
         public double[] getVisualBounds(BlockCache blockCache, int x, int y, int z);
 
-
+        public long getExtendedData(BlockCache blockCache, int x, int y, int z);
     }
 
     public static class BlockCacheNode implements IBlockCacheNode {
@@ -132,10 +136,12 @@ public abstract class BlockCache {
         private static final short FETCHED_DATA = 0x02;
         private static final short FETCHED_BOUNDS = 0x04;
         private static final short FETCHED_VISUAL_BOUNDS = 0x08;
+        private static final short FETCHED_EXTENDED_DATA = 0x10;
 
         private short fetched;
         private Material id;
         private int data = 0;
+        private long dynamicflags = 0;
         private double[] bounds = null;
         private double[] visualbounds = null;
 
@@ -144,6 +150,11 @@ public abstract class BlockCache {
             fetched = FETCHED_ID;
         }
 
+        @Override
+        public boolean isExtendedDataFetched() {
+            return (fetched & FETCHED_EXTENDED_DATA) != 0;
+        }
+        
         @Override
         public boolean isDataFetched() {
             return (fetched & FETCHED_DATA) != 0;
@@ -198,6 +209,11 @@ public abstract class BlockCache {
         public double[] getVisualBounds(BlockCache blockCache, int x, int y, int z) {
             return isVisualBoundsFetched() ? visualbounds : blockCache.getVisualBounds(x, y, z);
         }
+        
+        public void setExtendedData(long flags) {
+            this.dynamicflags = flags;
+            fetched |= FETCHED_EXTENDED_DATA;
+        }
 
         public void setData(int data) {
             this.data = data;
@@ -230,6 +246,16 @@ public abstract class BlockCache {
                                 );
             }
             return false;
+        }
+        
+        @Override
+        public long getExtendedData() {
+            return dynamicflags;
+        }
+
+        @Override
+        public long getExtendedData(BlockCache blockCache, int x, int y, int z) {
+            return isExtendedDataFetched() ? dynamicflags : blockCache.getExtendedData(x, y, z);
         }
 
     }
@@ -289,6 +315,19 @@ public abstract class BlockCache {
      */
     public abstract Material fetchTypeId(int x, int y, int z);
 
+    /**
+     * Fetch the data from the underlying world.
+     *
+     * @param x
+     *            the x
+     * @param y
+     *            the y
+     * @param z
+     *            the z
+     * @return the int
+     */
+    public abstract long fetchExtendedData(int x, int y, int z);
+    
     /**
      * Fetch the data from the underlying world.
      *
@@ -451,6 +490,27 @@ public abstract class BlockCache {
     public Material getType(final int x, final int y, final int z) {
         return getOrCreateNode(x, y, z).getType();
     }
+    
+    /**
+     * Get data value with cache access.
+     *
+     * @param x
+     *            the x
+     * @param y
+     *            the y
+     * @param z
+     *            the z
+     * @return the data
+     */
+    public long getExtendedData(final int x, final int y, final int z) {
+        final BlockCacheNode node = getOrCreateNode(x, y, z);
+        if (node.isExtendedDataFetched()) {
+            return node.getExtendedData();
+        }
+        final long nData = fetchExtendedData(x, y, z);
+        node.setExtendedData(nData);
+        return nData;
+    }
 
     /**
      * Get data value with cache access.
@@ -550,6 +610,9 @@ public abstract class BlockCache {
             // TODO: Consider a half-lazy variant (only force fetch bounds, which may or may not fetch data).
             if (!node.isDataFetched()) {
                 node.setData(fetchData(x, y, z));
+            }
+            if (!node.isExtendedDataFetched()) {
+                node.setExtendedData(fetchExtendedData(x, y, z));
             }
             if (!node.isBoundsFetched()) {
                 node.setBounds(fetchBounds(x, y, z));

@@ -82,6 +82,8 @@ public class BlockFlags {
     @Deprecated
     public static final long F_IGN_PASSABLE_CHECK = f_flag();
 
+    public static final long F_WATERLOGGED                  = f_flag();
+
     /** Like water. */
     public static final long F_WATER                        = f_flag();
 
