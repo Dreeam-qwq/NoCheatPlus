@@ -2,7 +2,7 @@
 
 This guide explains the extra compatibility diagnostics for Folia, Bedrock/Geyser/Floodgate detection, teleport sync, keep-alive timing, and block-cache fallback behavior.
 
-This branch intentionally does not replace Java Edition movement models. Java movement physics should stay tied to precise client/server behavior. Bedrock-specific movement tuning can be added behind Bedrock checks where exact client source behavior is not available.
+This branch intentionally does not replace Java Edition movement models. Java movement physics should stay tied to precise client/server behavior. Bedrock-specific movement tuning is kept behind Bedrock checks where exact client source behavior is not available.
 
 ## Enabling Console Detail
 
@@ -64,6 +64,19 @@ Repeated fallback events are rate-limited and logged with resolved/final-fallbac
 | FastBreak | `summary=block_timing{...}` | Block/tool timing, missing break time, configurable grace budget. |
 | KeepAliveFrequency | `summary=keepalive_bucket{...}` | Bucket timing, duplicate/fast keep-alive replies, Folia async timing. |
 | NetMoving | `summary=net_moving{...}` | Extreme packet movement versus teleport/server-position stale-packet contexts. |
+
+## Bedrock Movement Compatibility
+
+SurvivalFly keeps Java Edition movement on its original path. The Bedrock compatibility envelopes only run for players marked as Bedrock by Floodgate/Geyser detection or the Bedrock compatibility permission.
+
+Current Bedrock-only tags:
+
+| Tag | Meaning |
+| --- | --- |
+| `bedrock_partial_support_h` / `bedrock_partial_support_y` | Bedrock packet fit a bounded partial-support envelope near stairs, slabs, lanterns, carpets, layered snow, scaffolding, or similar support blocks. |
+| `bedrock_climbable_h` / `bedrock_climbable_y` | Bedrock packet fit a bounded climbable/scaffolding envelope. |
+| `bedrock_water_h` / `bedrock_water_y` | Bedrock packet fit a bounded water movement residual envelope. |
+| `bedrock_h_model_miss` / `bedrock_y_model_miss` | Bedrock context was detected, but the movement still exceeded the current envelope. Include the full detail/violation line in reports. |
 
 ## Bug Reports
 

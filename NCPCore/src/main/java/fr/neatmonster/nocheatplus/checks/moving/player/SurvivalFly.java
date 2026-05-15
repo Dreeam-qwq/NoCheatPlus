@@ -63,6 +63,7 @@ import fr.neatmonster.nocheatplus.utilities.collision.supportingblock.Supporting
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
+import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 import fr.neatmonster.nocheatplus.utilities.math.MathUtil;
 import fr.neatmonster.nocheatplus.utilities.math.TrigUtil;
 import fr.neatmonster.nocheatplus.utilities.moving.Magic;
@@ -92,6 +93,30 @@ public class SurvivalFly extends Check {
      * to calculate horizontal speed with, also affects the vertical speed (See comment in {@link fr.neatmonster.nocheatplus.utilities.location.RichEntityLocation#getFlowForceVector(int, int, int, long)}.
      */
     private double verticalLiquidPushComponent = 0.0;
+
+    /*
+     * Bedrock-only compatibility envelopes. Java Edition movement is deliberately
+     * left on the original SurvivalFly path; these are only used after
+     * pData.isBedrockPlayer() has matched a Geyser/Floodgate/permission-marked
+     * player. The values are empirical starting boundaries for the Bedrock false
+     * positives observed around partial block support and water/climbable packet
+     * differences.
+     */
+    private static final double BEDROCK_PARTIAL_SUPPORT_H_RESIDUAL = 0.18D;
+    private static final double BEDROCK_PARTIAL_SUPPORT_H_CAP = 0.95D;
+    private static final double BEDROCK_PARTIAL_SUPPORT_Y_RESIDUAL = 0.65D;
+    private static final double BEDROCK_PARTIAL_SUPPORT_Y_MIN = -0.625D;
+    private static final double BEDROCK_PARTIAL_SUPPORT_Y_MAX = 0.625D;
+    private static final double BEDROCK_CLIMBABLE_H_RESIDUAL = 0.08D;
+    private static final double BEDROCK_CLIMBABLE_H_CAP = 0.35D;
+    private static final double BEDROCK_CLIMBABLE_Y_RESIDUAL = 0.35D;
+    private static final double BEDROCK_CLIMBABLE_Y_MIN = -0.45D;
+    private static final double BEDROCK_CLIMBABLE_Y_MAX = 0.35D;
+    private static final double BEDROCK_WATER_H_RESIDUAL = 0.22D;
+    private static final double BEDROCK_WATER_H_CAP = 0.85D;
+    private static final double BEDROCK_WATER_Y_RESIDUAL = 0.24D;
+    private static final double BEDROCK_WATER_Y_MIN = -0.50D;
+    private static final double BEDROCK_WATER_Y_MAX = 0.42D;
     
     
     public SurvivalFly() {
@@ -211,6 +236,15 @@ public class SurvivalFly extends Check {
             final double[] res = vDistRel(player, from, fromOnGround, resetFrom, to, toOnGround, resetTo, thisMove.yDistance, isNormalOrPacketSplitMove, lastMove, data, pData, false, debug, useBlockChangeTracker );
             yAllowedDistance = res[0];
             yDistanceAboveLimit = res[1];
+        }
+        if (hDistanceAboveLimit > 0.0 || yDistanceAboveLimit > 0.0) {
+            final double[] bedrockRes = applyBedrockCompatibilityModels(player, from, to,
+                    hAllowedDistance, hDistanceAboveLimit, yAllowedDistance, yDistanceAboveLimit,
+                    thisMove, lastMove, pData);
+            hAllowedDistance = bedrockRes[0];
+            hDistanceAboveLimit = bedrockRes[1];
+            yAllowedDistance = bedrockRes[2];
+            yDistanceAboveLimit = bedrockRes[3];
         }
 
 
@@ -370,6 +404,160 @@ public class SurvivalFly extends Check {
                 && lastMove.toIsValid
                 && lastMove.yDistance < -Magic.GRAVITY_MIN
                 && thisMove.yDistance - lastMove.yDistance < -Magic.GRAVITY_MIN);
+    }
+
+    /**
+     * Bedrock support model: Geyser/Floodgate movement can disagree with Java
+     * support sampling on thin or partial blocks. Keep this behind Bedrock
+     * detection so Java movement remains reviewer-owned and client-precision based.
+     */
+    private double[] applyBedrockCompatibilityModels(final Player player,
+                                                     final PlayerLocation from, final PlayerLocation to,
+                                                     double hAllowedDistance, double hDistanceAboveLimit,
+                                                     double yAllowedDistance, double yDistanceAboveLimit,
+                                                     final PlayerMoveData thisMove, final PlayerMoveData lastMove,
+                                                     final IPlayerData pData) {
+        if (!pData.isBedrockPlayer() || Bridge1_9.isGliding(player)) {
+            return new double[] {hAllowedDistance, hDistanceAboveLimit, yAllowedDistance, yDistanceAboveLimit};
+        }
+        final boolean partialSupport = isBedrockPartialSupportContext(from, to, thisMove, lastMove);
+        final boolean climbable = isBedrockClimbableContext(from, to, thisMove);
+        final boolean water = isBedrockWaterContext(from, to, thisMove);
+        if (hDistanceAboveLimit > 0.0) {
+            if (partialSupport && acceptsBedrockHorizontalEnvelope(thisMove, hAllowedDistance,
+                    hDistanceAboveLimit, BEDROCK_PARTIAL_SUPPORT_H_RESIDUAL,
+                    BEDROCK_PARTIAL_SUPPORT_H_CAP, "bedrock_partial_support_h")) {
+                hAllowedDistance = thisMove.hAllowedDistance;
+                hDistanceAboveLimit = 0.0;
+            }
+            else if (climbable && acceptsBedrockHorizontalEnvelope(thisMove, hAllowedDistance,
+                    hDistanceAboveLimit, BEDROCK_CLIMBABLE_H_RESIDUAL,
+                    BEDROCK_CLIMBABLE_H_CAP, "bedrock_climbable_h")) {
+                hAllowedDistance = thisMove.hAllowedDistance;
+                hDistanceAboveLimit = 0.0;
+            }
+            else if (water && acceptsBedrockHorizontalEnvelope(thisMove, hAllowedDistance,
+                    hDistanceAboveLimit, BEDROCK_WATER_H_RESIDUAL,
+                    BEDROCK_WATER_H_CAP, "bedrock_water_h")) {
+                hAllowedDistance = thisMove.hAllowedDistance;
+                hDistanceAboveLimit = 0.0;
+            }
+            else if (partialSupport || climbable || water) {
+                tags.add("bedrock_h_model_miss");
+            }
+        }
+        if (yDistanceAboveLimit > 0.0) {
+            if (partialSupport && acceptsBedrockVerticalEnvelope(thisMove, yDistanceAboveLimit,
+                    BEDROCK_PARTIAL_SUPPORT_Y_MIN, BEDROCK_PARTIAL_SUPPORT_Y_MAX,
+                    BEDROCK_PARTIAL_SUPPORT_Y_RESIDUAL, BEDROCK_PARTIAL_SUPPORT_H_CAP,
+                    "bedrock_partial_support_y")) {
+                yAllowedDistance = thisMove.yAllowedDistance;
+                yDistanceAboveLimit = 0.0;
+            }
+            else if (climbable && acceptsBedrockVerticalEnvelope(thisMove, yDistanceAboveLimit,
+                    BEDROCK_CLIMBABLE_Y_MIN, BEDROCK_CLIMBABLE_Y_MAX,
+                    BEDROCK_CLIMBABLE_Y_RESIDUAL, BEDROCK_CLIMBABLE_H_CAP,
+                    "bedrock_climbable_y")) {
+                yAllowedDistance = thisMove.yAllowedDistance;
+                yDistanceAboveLimit = 0.0;
+            }
+            else if (water && acceptsBedrockVerticalEnvelope(thisMove, yDistanceAboveLimit,
+                    BEDROCK_WATER_Y_MIN, BEDROCK_WATER_Y_MAX,
+                    BEDROCK_WATER_Y_RESIDUAL, BEDROCK_WATER_H_CAP,
+                    "bedrock_water_y")) {
+                yAllowedDistance = thisMove.yAllowedDistance;
+                yDistanceAboveLimit = 0.0;
+            }
+            else if (partialSupport || climbable || water) {
+                tags.add("bedrock_y_model_miss");
+            }
+        }
+        return new double[] {hAllowedDistance, hDistanceAboveLimit, yAllowedDistance, yDistanceAboveLimit};
+    }
+
+    private boolean acceptsBedrockHorizontalEnvelope(final PlayerMoveData thisMove,
+                                                    final double hAllowedDistance,
+                                                    final double hDistanceAboveLimit,
+                                                    final double residual,
+                                                    final double moveCap,
+                                                    final String tag) {
+        final double modelLimit = Math.max(hAllowedDistance, Math.min(moveCap, hAllowedDistance + residual));
+        if (thisMove.hDistance <= modelLimit + Magic.PREDICTION_EPSILON
+                && hDistanceAboveLimit <= residual + Magic.PREDICTION_EPSILON) {
+            thisMove.hAllowedDistance = modelLimit;
+            tags.add(tag);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean acceptsBedrockVerticalEnvelope(final PlayerMoveData thisMove,
+                                                  final double yDistanceAboveLimit,
+                                                  final double minY,
+                                                  final double maxY,
+                                                  final double residual,
+                                                  final double horizontalCap,
+                                                  final String tag) {
+        if (thisMove.yDistance >= minY
+                && thisMove.yDistance <= maxY
+                && thisMove.hDistance <= horizontalCap
+                && yDistanceAboveLimit <= residual + Magic.PREDICTION_EPSILON) {
+            /*
+             * Existing SurvivalFly violation math expects one allowed value. The
+             * Bedrock envelope has already accepted the actual packet, so normalize
+             * the remaining residual for that legacy result path.
+             */
+            thisMove.yAllowedDistance = thisMove.yDistance;
+            tags.add(tag);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isBedrockPartialSupportContext(final PlayerLocation from, final PlayerLocation to,
+                                                   final PlayerMoveData thisMove, final PlayerMoveData lastMove) {
+        if (!isBedrockPartialSupportNear(from) && !isBedrockPartialSupportNear(to)) {
+            return false;
+        }
+        return thisMove.touchedGround || thisMove.touchedGroundWorkaround
+                || thisMove.from.onGroundOrResetCond || thisMove.to.onGroundOrResetCond
+                || lastMove.toIsValid && (lastMove.to.onGroundOrResetCond || lastMove.touchedGround)
+                || from.isOnGround(0.65D, 0.05D, 0.05D)
+                || to.isOnGround(0.65D, 0.05D, 0.05D);
+    }
+
+    private boolean isBedrockPartialSupportNear(final PlayerLocation loc) {
+        return isBedrockPartialSupportBlock(loc.getBlockType())
+                || isBedrockPartialSupportBlock(loc.getBlockTypeBelow())
+                || isBedrockPartialSupportBlock(loc.getBlockType(loc.getBlockX(), loc.getBlockY() + 1, loc.getBlockZ()));
+    }
+
+    private boolean isBedrockPartialSupportBlock(final Material mat) {
+        if (mat == null) {
+            return false;
+        }
+        final long flags = BlockFlags.getBlockFlags(mat);
+        return (flags & (BlockFlags.F_STAIRS | BlockFlags.F_CARPET | BlockFlags.F_SCAFFOLDING | BlockFlags.F_POWDER_SNOW)) != 0
+                || MaterialUtil.SLABS.contains(mat)
+                || MaterialUtil.LANTERNS.contains(mat)
+                || mat == Material.SNOW;
+    }
+
+    private boolean isBedrockClimbableContext(final PlayerLocation from, final PlayerLocation to,
+                                              final PlayerMoveData thisMove) {
+        return from.isOnClimbable() || to.isOnClimbable()
+                || thisMove.from.onClimbable || thisMove.to.onClimbable
+                || isBedrockClimbableBlock(from.getBlockType())
+                || isBedrockClimbableBlock(to.getBlockType());
+    }
+
+    private boolean isBedrockClimbableBlock(final Material mat) {
+        return mat != null && (BlockFlags.getBlockFlags(mat) & (BlockFlags.F_CLIMBABLE | BlockFlags.F_SCAFFOLDING)) != 0;
+    }
+
+    private boolean isBedrockWaterContext(final PlayerLocation from, final PlayerLocation to,
+                                          final PlayerMoveData thisMove) {
+        return from.isInWater() || to.isInWater() || thisMove.from.inWater || thisMove.to.inWater;
     }
     
     
