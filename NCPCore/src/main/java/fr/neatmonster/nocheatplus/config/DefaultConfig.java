@@ -483,8 +483,6 @@ public class DefaultConfig extends ConfigFile {
         set(ConfPaths.MOVING_SURVIVALFLY_STEPHEIGHT, "default", 154);
         set(ConfPaths.MOVING_SURVIVALFLY_EXTENDED_RESETITEM, true, 154);
         set(ConfPaths.MOVING_SURVIVALFLY_EXTENDED_STRICT_HORIZONTAL_PREDICTION, true, 154);
-        // Elytra model collection: keep false while tuning from flightTrace/detail logs to avoid setback deaths.
-        set(ConfPaths.MOVING_SURVIVALFLY_ELYTRA_ENFORCE, false, 154);
         // SurvivalFly - ViolationFrequencyHook
         set(ConfPaths.MOVING_SURVIVALFLY_VLFREQUENCY_ACTIVE, true, 154);
         set(ConfPaths.MOVING_SURVIVALFLY_VLFREQUENCY_DEBUG, false, 154);
@@ -502,8 +500,6 @@ public class DefaultConfig extends ConfigFile {
             + " vl>2100 cancel log:survivalflyhighvl:0:4:icf cmdc:kickfly:0:15", 154);     
         // SurvivalFly - Hover Subcheck
         set(ConfPaths.MOVING_SURVIVALFLY_HOVER_CHECK, true, 154); // Not a check type yet.
-        // Elytra hover model telemetry stays data-only by default until server owners opt into enforcement.
-        set(ConfPaths.MOVING_SURVIVALFLY_HOVER_ELYTRA_ENFORCE, false, 154);
         set(ConfPaths.MOVING_SURVIVALFLY_HOVER_STEP, 5, 154);
         set(ConfPaths.MOVING_SURVIVALFLY_HOVER_TICKS, 85, 154);
         set(ConfPaths.MOVING_SURVIVALFLY_HOVER_LOGINTICKS, 60, 154);

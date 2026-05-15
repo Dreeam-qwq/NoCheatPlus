@@ -83,7 +83,7 @@ public abstract class ConfPaths {
     public static final String  LOGGING_ACTIVE                           = LOGGING + SUB_ACTIVE;
     public static final String  LOGGING_MAXQUEUESIZE                     = LOGGING + "max-queue-size";
     private static final String LOGGING_DEBUG_SECTION                    = LOGGING + "debug.";
-    /** Toggle for custom verbose diagnostic lines such as [NCP][SurvivalFly][detail]. */
+    /** Toggle for custom verbose compatibility diagnostic lines. */
     public static final String  LOGGING_DEBUG_TO_CONSOLE                 = LOGGING_DEBUG_SECTION + "to-console";
 
     private static final String LOGGING_BACKEND                          = LOGGING + "backend.";
@@ -632,8 +632,6 @@ public abstract class ConfPaths {
     private static final String MOVING_SURVIVALFLY_EXTENDED                 = MOVING_SURVIVALFLY + "extended.";
     public static final String MOVING_SURVIVALFLY_EXTENDED_RESETITEM        = MOVING_SURVIVALFLY_EXTENDED + "reset-activeitem";
     public static final String MOVING_SURVIVALFLY_EXTENDED_STRICT_HORIZONTAL_PREDICTION = MOVING_SURVIVALFLY_EXTENDED + "strict-speed-prediction";
-    private static final String MOVING_SURVIVALFLY_ELYTRA                   = MOVING_SURVIVALFLY + "elytra.";
-    public static final String MOVING_SURVIVALFLY_ELYTRA_ENFORCE            = MOVING_SURVIVALFLY_ELYTRA + "enforce";
     private static final String MOVING_SURVIVALFLY_LENIENCY                 = MOVING_SURVIVALFLY + "leniency.";
     public static final String MOVING_SURVIVALFLY_LENIENCY_FREEZECOUNT      = MOVING_SURVIVALFLY_LENIENCY + "freeze-count";
     public static final String MOVING_SURVIVALFLY_LENIENCY_FREEZEINAIR      = MOVING_SURVIVALFLY_LENIENCY + "freeze-inair";
@@ -651,7 +649,6 @@ public abstract class ConfPaths {
     @GlobalConfig
     public static final String  MOVING_SURVIVALFLY_HOVER                    = MOVING_SURVIVALFLY + "hover.";
     public static final String  MOVING_SURVIVALFLY_HOVER_CHECK              = MOVING_SURVIVALFLY_HOVER + SUB_ACTIVE;
-    public static final String  MOVING_SURVIVALFLY_HOVER_ELYTRA_ENFORCE     = MOVING_SURVIVALFLY_HOVER + "elytra-enforce";
     public static final String  MOVING_SURVIVALFLY_HOVER_STEP               = MOVING_SURVIVALFLY_HOVER + "step";
     public static final String  MOVING_SURVIVALFLY_HOVER_TICKS              = MOVING_SURVIVALFLY_HOVER + "ticks";
     public static final String  MOVING_SURVIVALFLY_HOVER_LOGINTICKS         = MOVING_SURVIVALFLY_HOVER + "login-ticks";
