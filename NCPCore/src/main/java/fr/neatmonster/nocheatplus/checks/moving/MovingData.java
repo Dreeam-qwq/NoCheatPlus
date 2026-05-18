@@ -550,6 +550,24 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     }
 
 
+    public void onExternalTeleportResync(final Location loc) {
+        // Teleport/Folia support: NET_MOVING accepted a stale pre-teleport packet, so old move history must not
+        // remain available as a future setback target.
+        playerMoves.invalidate();
+        clearPlayerMorePacketsData();
+        sfJumpPhase = 0;
+        sfHoverTicks = -1;
+        verticalBounce = null;
+        timeSinceSetBack = 0;
+        if (loc != null && loc.getWorld() != null) {
+            // Folia/teleport safety: packet models can carry coordinate-only targets, but set backs need a real world.
+            setSetBack(loc);
+        }
+        resetTeleported();
+        joinOrRespawn = false;
+    }
+
+
     /**
      * Reduce the morepackets frequency counters by the given amount, capped at
      * a minimum of 0.
@@ -835,14 +853,14 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
      * Set on {@link org.bukkit.event.player.PlayerRiptideEvent} to "MAYBE", as we don't yet know whether the riptide push is applied with or without the 1.2 vertical move from ground.
      */
     public void setTridentReleaseEvent(AlmostBoolean isReleased) {
-        tridentRelease = isReleased;
+        tridentRelease = isReleased == null ? AlmostBoolean.NO : isReleased;
     }
 
     /**
      * Set when pass to PlayerMoveData, also reset state
      */
     public AlmostBoolean consumeTridentReleaseEvent() {
-        final AlmostBoolean result = tridentRelease;
+        final AlmostBoolean result = tridentRelease == null ? AlmostBoolean.NO : tridentRelease;
         tridentRelease = AlmostBoolean.NO;
         return result;
     }
