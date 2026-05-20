@@ -14,6 +14,8 @@
  */
 package fr.neatmonster.nocheatplus.checks.moving.player;
 
+import java.util.Collection;
+
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
@@ -473,7 +475,8 @@ public class HiddenMotionReconstructor {
                                                             final double xDistance, final double zDistance, final MovingData data, final IPlayerData pData,
                                                             final PlayerLocation from, final boolean onGround, final int depthRemaining, final double totalX,
                                                             final double totalZ, final boolean crouching, final double sneakingFactor, final boolean usingItem,
-                                                            final double targetX, final double targetZ, final int depthIndex) {
+                                                            final double targetX, final double targetZ, final int depthIndex,
+                                                            final double yDistanceBeforeCollide, final boolean flying) {
         
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
         
@@ -497,9 +500,20 @@ public class HiddenMotionReconstructor {
         // threshold, so this tick cannot be a hidden tick — stop recursing.
         // The threshold differs between old and new protocol versions.
         // ------------------------------------------------------------------
-        final double suppressionThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
-        if (MathUtil.dist(xDistance, zDistance) > suppressionThreshold) {
-            return new double[]{0.0, 0.0, targetX - totalX, targetZ - totalZ};
+        final double suppressionThresholdSq = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
+        final double incomingHSq = MathUtil.square(xDistance) + MathUtil.square(zDistance);
+        final boolean incomingSuppressed = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? MathUtil.dist(xDistance, zDistance) < suppressionThresholdSq
+                : incomingHSq < suppressionThresholdSq;
+        final double residualX = targetX - totalX;
+        final double residualZ = targetZ - totalZ;
+        final double residualSq = MathUtil.square(residualX) + MathUtil.square(residualZ);
+        final boolean residualNeedsHidden = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? MathUtil.dist(residualX, residualZ) >= suppressionThresholdSq
+                : residualSq >= suppressionThresholdSq;
+        if (!incomingSuppressed && !residualNeedsHidden) {
+            return new double[]{0.0, 0.0, residualX, residualZ};
         }
         
         // ------------------------------------------------------------------
@@ -511,7 +525,14 @@ public class HiddenMotionReconstructor {
         final PlayerMoveData lastMove = data.playerMoves.getFirstPastMove();
         double baseX = xDistance;
         double baseZ = zDistance;
-        
+
+        if (data.lastStuckInBlockHorizontal != 1.0) {
+            if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) {
+                baseX = 0.0;
+                baseZ = 0.0;
+            }
+        }
+
         if (from.isOnSlimeBlock() && onGround) {
             if (Math.abs(lastMove.yDistance) < 0.1 && !pData.isShiftKeyPressed()) {
                 if (thisMove.yDistance == 0.0) {
@@ -525,20 +546,14 @@ public class HiddenMotionReconstructor {
                 }
             }
         }
-        
+
         if (from.isSlidingDown()) {
             if (lastMove.yDistance < -Magic.SLIDE_START_AT_VERTICAL_MOTION_THRESHOLD) {
                 baseX *= -Magic.SLIDE_SPEED_THROTTLE / lastMove.yDistance;
                 baseZ *= -Magic.SLIDE_SPEED_THROTTLE / lastMove.yDistance;
             }
         }
-        if (data.lastStuckInBlockHorizontal != 1.0) {
-            if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) {
-                baseX = 0.0;
-                baseZ = 0.0;
-            }
-        }
-        
+
         baseX *= (double) data.nextBlockSpeedMultiplier;
         baseZ *= (double) data.nextBlockSpeedMultiplier;
         
@@ -599,6 +614,10 @@ public class HiddenMotionReconstructor {
                 resultX *= (double) data.nextStuckInBlockHorizontal;
                 resultZ *= (double) data.nextStuckInBlockHorizontal;
             }
+            final double[] afterEdge = { resultX, resultZ };
+            applyMaybeBackOffFromEdge(from, pData, flying, yDistanceBeforeCollide, afterEdge);
+            resultX = afterEdge[0];
+            resultZ = afterEdge[1];
             
             // Check whether adding this tick's displacement gets us within epsilon of the target.
             final double nextTotalX = totalX + resultX;
@@ -612,7 +631,8 @@ public class HiddenMotionReconstructor {
             // Recurse one level deeper with this candidate's resulting velocity.
             double[] nextRes = reconstructHiddenTicksRecursive(sinYaw, cosYaw, movementSpeed, inputs, resultX, resultZ,
                                                                data, pData, from, onGround, depthRemaining - 1, nextTotalX, nextTotalZ,
-                                                               crouching, sneakingFactor, usingItem, targetX, targetZ, depthIndex + 1);
+                                                               crouching, sneakingFactor, usingItem, targetX, targetZ, depthIndex + 1,
+                                                               yDistanceBeforeCollide, flying);
             
             // Fold the sub-result back: accumulated displacement = this tick + child ticks.
             double[] candidate = new double[] {
@@ -640,8 +660,18 @@ public class HiddenMotionReconstructor {
         // the candidate list was empty (should never happen with 9 fixed candidates).
         return best != null ? best : new double[] {0.0, 0.0, targetX - totalX, targetZ - totalZ};
     }
-    
-    
+
+    private static void applyMaybeBackOffFromEdge(final PlayerLocation from, final IPlayerData pData, final boolean flying,
+            final double yBeforeCollide, final double[] horizontal) {
+        if (!flying && pData.isShiftKeyPressed() && from.isAboveGround() && yBeforeCollide <= 0.0) {
+            final Vector backOff = from.maybeBackOffFromEdge(new Vector(horizontal[0], yBeforeCollide, horizontal[1]));
+            horizontal[0] = backOff.getX();
+            horizontal[1] = backOff.getZ();
+        }
+    }
+
+
+
     /////////////////////////////
     // Public API
     /////////////////////////////
@@ -754,11 +784,10 @@ public class HiddenMotionReconstructor {
             baseX += lungeVelocity.getX();
             baseZ += lungeVelocity.getZ();
         }
-        if (!flying && pData.isShiftKeyPressed() && from.isAboveGround() && thisMove.yDistance <= 0.0) {
-            Vector backOff = from.maybeBackOffFromEdge(new Vector(thisMove.xAllowedDistance, yDistanceBeforeCollide, thisMove.zAllowedDistance));
-            baseX = backOff.getX();
-            baseZ = backOff.getZ();
-        }
+        final double[] stopHoriz = { baseX, baseZ };
+        applyMaybeBackOffFromEdge(from, pData, flying, yDistanceBeforeCollide, stopHoriz);
+        baseX = stopHoriz[0];
+        baseZ = stopHoriz[1];
         Vector collisionVector = from.collide(new Vector(baseX, yDistanceBeforeCollide, baseZ), onGround, from.getBoundingBox());
         return new double[] {collisionVector.getX(), collisionVector.getZ()}; 
     }
@@ -803,17 +832,200 @@ public class HiddenMotionReconstructor {
     public static double[] findBestHiddenTickExplanation(float sinYaw, float cosYaw, float movementspeed, PlayerKeyboardInput input,
                                                          final double xDistance, final double zDistance, final MovingData data, final IPlayerData pData, final PlayerLocation from,
                                                          final boolean crouching, final double sneakingFactor, final boolean usingItem,
-                                                         final boolean onGround, final double totalX, final double totalZ) {
+                                                         final boolean onGround, final double totalX, final double totalZ,
+                                                         final double yDistanceBeforeCollide, final boolean flying) {
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
         return reconstructHiddenTicksRecursive(sinYaw, cosYaw, movementspeed, new PlayerKeyboardInput[] {input},
                                                xDistance, zDistance, data, pData, from, onGround, MAX_HIDDEN_TICK_DEPTH,
                                                totalX, totalZ, crouching, sneakingFactor, usingItem,
-                                               thisMove.xDistance, thisMove.zDistance, 0);
+                                               thisMove.xDistance, thisMove.zDistance, 0,
+                                               yDistanceBeforeCollide, flying);
     }
     public static double[] findBestHiddenTickExplanation(final double yDistance, final Player player, final MovingData data, final CombinedData cData, final IPlayerData pData, 
                                                          final PlayerLocation from, final PlayerLocation to, final double jumpGain, 
                                                          final double verticalLiquidPushComponent, final boolean onGround, final double totalY) {
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
         return reconstructHiddenTicksRecursive(yDistance, player, data, cData, pData, from, to, jumpGain, verticalLiquidPushComponent, onGround, MAX_HIDDEN_TICK_DEPTH, totalY, thisMove.yDistance, 0);
+    }
+
+    /**
+     * Vanilla keeps {@code deltaMovement} on axes reduced by {@code maybeBackOffFromEdge} while move packets only
+     * carry cutoff displacement on those axes. Store pre-edge components for next-tick momentum ({@code motionX}/{@code motionZ}).
+     */
+    static void storeEdgeHiddenMotion(final PlayerMoveData move, final double preEdgeX, final double preEdgeZ,
+            final double backOffX, final double backOffZ, final double packetSuppressH) {
+        final boolean clippedX = preEdgeX != backOffX;
+        final boolean clippedZ = preEdgeZ != backOffZ;
+        final boolean suppressedPktX = Math.abs(move.xDistance) < packetSuppressH && Math.abs(preEdgeX) >= packetSuppressH;
+        final boolean suppressedPktZ = Math.abs(move.zDistance) < packetSuppressH && Math.abs(preEdgeZ) >= packetSuppressH;
+        move.motionX = (clippedX || suppressedPktX) ? preEdgeX : move.xDistance;
+        move.motionZ = (clippedZ || suppressedPktZ) ? preEdgeZ : move.zDistance;
+        if (clippedX || clippedZ || suppressedPktX || suppressedPktZ) {
+            move.edgeAxisClamped = true;
+        }
+        if (clippedX && clippedZ) {
+            move.edgeCornerClamp = true;
+        }
+    }
+
+    /**
+     * Per-input candidate variant for the brute-force path in {@link SurvivalFly}.
+     */
+    static void storeEdgeHiddenMotionCandidate(final PlayerMoveData move, final double[] xMotion, final double[] zMotion, final int index,
+            final double preEdgeX, final double preEdgeZ, final double backOffX, final double backOffZ,
+            final double packetX, final double packetZ, final double packetSuppressH) {
+        final boolean clippedX = preEdgeX != backOffX;
+        final boolean clippedZ = preEdgeZ != backOffZ;
+        final boolean suppressedPktX = Math.abs(packetX) < packetSuppressH && Math.abs(preEdgeX) >= packetSuppressH;
+        final boolean suppressedPktZ = Math.abs(packetZ) < packetSuppressH && Math.abs(preEdgeZ) >= packetSuppressH;
+        xMotion[index] = (clippedX || suppressedPktX) ? preEdgeX : packetX;
+        zMotion[index] = (clippedZ || suppressedPktZ) ? preEdgeZ : packetZ;
+    }
+
+    /**
+     * Pick the WASD index whose pre-edge vector is still clamped at the edge (for momentum when prediction is uncertain).
+     * Uses the back-off arrays already populated by the brute loop — no extra {@code maybeBackOffFromEdge} calls.
+     */
+    static int findBestEdgeMomentumIndex(final double[] xPre, final double[] zPre,
+            final double[] xBackOff, final double[] zBackOff, final int preferredIdx) {
+        if (preferredIdx >= 0 && preferredIdx < 9
+                && edgeStillClampsCached(xPre[preferredIdx], zPre[preferredIdx], xBackOff[preferredIdx], zBackOff[preferredIdx])) {
+            return preferredIdx;
+        }
+        int bestIdx = -1;
+        double bestH = -1.0;
+        for (int i = 0; i < 9; i++) {
+            if (!edgeStillClampsCached(xPre[i], zPre[i], xBackOff[i], zBackOff[i])) {
+                continue;
+            }
+            final double h = MathUtil.dist(xPre[i], zPre[i]);
+            if (h > bestH) {
+                bestH = h;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
+    }
+
+    /**
+     * True if {@code maybeBackOffFromEdge} would change this horizontal vector (still on an edge).
+     */
+    static boolean edgeStillClamps(final PlayerLocation from, final double yBeforeCollide,
+            final double vecX, final double vecZ) {
+        final Vector backOff = from.maybeBackOffFromEdge(new Vector(vecX, yBeforeCollide, vecZ));
+        return backOff.getX() != vecX || backOff.getZ() != vecZ;
+    }
+
+    /** No-call variant: reuse a known back-off result instead of recomputing. */
+    static boolean edgeStillClampsCached(final double vecX, final double vecZ,
+            final double backOffX, final double backOffZ) {
+        return backOffX != vecX || backOffZ != vecZ;
+    }
+
+    /** No-call variant: reuse a known back-off result instead of recomputing. */
+    static boolean edgeStillClampsCornerCached(final double vecX, final double vecZ,
+            final double backOffX, final double backOffZ) {
+        return backOffX != vecX && backOffZ != vecZ;
+    }
+
+    /**
+     * Carry hidden momentum only while shift-sneaking at an edge and backoff still clamps the prior hidden vector.
+     */
+    static boolean shouldUseEdgeHiddenCarry(final boolean edgeSneakNow, final PlayerLocation from,
+            final double yDistanceBeforeCollide, final PlayerMoveData lastMove) {
+        if (!edgeSneakNow || !lastMove.toIsValid || !lastMove.edgeBackoffApplied || !lastMove.edgeAxisClamped) {
+            return false;
+        }
+        return edgeStillClamps(from, yDistanceBeforeCollide, lastMove.motionX, lastMove.motionZ);
+    }
+
+    /**
+     * Match tolerance scales with sneak/speed so swift sneak and speed potions stay within legit bounds.
+     */
+    static double edgeCornerMatchTolerance(final double referenceHorizontalSpeed) {
+        final double scaled = referenceHorizontalSpeed * Magic.EDGE_SNEAK_CORNER_MATCH_SPEED_RATIO + Magic.PREDICTION_EPSILON;
+        return Math.min(Magic.EDGE_SNEAK_CORNER_MATCH_TOLERANCE_MAX,
+                Math.max(Magic.EDGE_SNEAK_CORNER_MATCH_TOLERANCE_MIN, scaled));
+    }
+
+    static double packetSuppressThresholdH(final IPlayerData pData) {
+        if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)) {
+            return Magic.Minecraft_minMoveSqDistance_legacy;
+        }
+        return Math.sqrt(Magic.Minecraft_minMoveSqDist_modern);
+    }
+
+    static double edgeSneakBypassMaxH(final MovingData data) {
+        final float walkSpeed = data.walkSpeed > 0.0f ? data.walkSpeed : 0.1f;
+        return Math.min(Magic.EDGE_SNEAK_BYPASS_MAX_HDIST_HARD,
+                Math.max(Magic.EDGE_SNEAK_BYPASS_MAX_HDIST, walkSpeed * Magic.EDGE_SNEAK_BYPASS_WALK_SPEED_FACTOR));
+    }
+
+    /**
+     * Shift-sneak at a block edge: if horizontal prediction disagrees with the packet, trust the packet
+     * (within a walk-speed-scaled cap). Cheap alternative to hidden-tick folding on 1.18+.
+     */
+    static double applyEdgeSneakBypass(final Player player, final IPlayerData pData, final MovingData data,
+            final PlayerLocation from, final PlayerMoveData lastMove, final PlayerMoveData thisMove,
+            final double hDistanceAboveLimit, final Collection<String> tags) {
+        final boolean edgeTick = thisMove.edgeBackoffApplied || (lastMove.toIsValid && lastMove.edgeBackoffApplied);
+        if (!edgeTick) {
+            return hDistanceAboveLimit;
+        }
+        final double maxH = edgeSneakBypassMaxH(data);
+        final double refH = Math.max(thisMove.hDistance, thisMove.hAllowedDistance);
+        if (thisMove.hDistance > maxH && hDistanceAboveLimit > edgeCornerMatchTolerance(refH)) {
+            return hDistanceAboveLimit;
+        }
+        thisMove.xAllowedDistance = thisMove.xDistance;
+        thisMove.zAllowedDistance = thisMove.zDistance;
+        thisMove.hAllowedDistance = thisMove.hDistance;
+        thisMove.motionX = thisMove.xDistance;
+        thisMove.motionZ = thisMove.zDistance;
+        tags.add("edge_bypass");
+        return 0.0;
+    }
+
+    /**
+     * After edge brute-force, at least one candidate was clipped by {@code maybeBackOffFromEdge}.
+     */
+    static boolean anyEdgeCandidateClipped(final double[] xMotionBeforeEdge, final double[] zMotionBeforeEdge,
+            final double[] xBackOffAfterEdge, final double[] zBackOffAfterEdge) {
+        for (int j = 0; j < 9; j++) {
+            if (xBackOffAfterEdge[j] != xMotionBeforeEdge[j] || zBackOffAfterEdge[j] != zMotionBeforeEdge[j]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * At a block corner both axes may be clipped while packets show single-axis micro-steps.
+     * Pick the WASD candidate whose post-edge or post-collide displacement is closest to the packet.
+     *
+     * @return Candidate index, or {@code -1} if none is within {@link #edgeCornerMatchTolerance(double)}.
+     */
+    static int findBestEdgeCornerCandidate(final double packetX, final double packetZ, final double packetH,
+            final double[] xPost, final double[] zPost, final double[] xBackOff, final double[] zBackOff,
+            final boolean strict, final double matchTolerance) {
+        int bestIdx = -1;
+        double bestScore = Double.MAX_VALUE;
+        for (int i = 0; i < 9; i++) {
+            final double postScore = strict
+                    ? Math.abs(packetX - xPost[i]) + Math.abs(packetZ - zPost[i])
+                    : Math.abs(packetH - MathUtil.dist(xPost[i], zPost[i]));
+            final double backScore = strict
+                    ? Math.abs(packetX - xBackOff[i]) + Math.abs(packetZ - zBackOff[i])
+                    : Math.abs(packetH - MathUtil.dist(xBackOff[i], zBackOff[i]));
+            final double score = Math.min(postScore, backScore);
+            if (score < bestScore) {
+                bestScore = score;
+                bestIdx = i;
+            }
+        }
+        if (bestIdx >= 0 && bestScore <= matchTolerance) {
+            return bestIdx;
+        }
+        return -1;
     }
 }

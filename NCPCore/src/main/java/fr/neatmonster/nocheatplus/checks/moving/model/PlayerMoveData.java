@@ -92,6 +92,30 @@ public class PlayerMoveData extends MoveData {
      */
     public boolean hasAttackSlowDown;
 
+    /**
+     * Set when {@code maybeBackOffFromEdge} ran this tick (shift + above ground).
+     * Used for sneak-edge corner recovery in SurvivalFly.
+     */
+    public boolean edgeBackoffApplied;
+
+    /**
+     * Set when edge backoff reduced at least one horizontal axis this tick ({@code preEdge != backOff}).
+     */
+    public boolean edgeAxisClamped;
+
+    /**
+     * Set when edge backoff clipped both X and Z on at least one brute candidate (block corner).
+     */
+    public boolean edgeCornerClamp;
+
+    /**
+     * Set when a corner candidate was matched and applied this tick ({@link SurvivalFly}).
+     */
+    public boolean edgeCornerResolved;
+
+    public double motionX;
+    public double motionY;
+    public double motionZ;
 
     // Bounds set by checks.
     /**
@@ -311,6 +335,13 @@ public class PlayerMoveData extends MoveData {
     protected void resetBase() {
         // Properties of the player.
         hasAttackSlowDown = false;
+        edgeBackoffApplied = false;
+        edgeAxisClamped = false;
+        edgeCornerClamp = false;
+        edgeCornerResolved = false;
+        motionX = 0.0;
+        motionY = 0.0;
+        motionZ = 0.0;
         submergedLavaHeight = 0.0;
         submergedWaterHeight = 0.0;
         isGliding = false;

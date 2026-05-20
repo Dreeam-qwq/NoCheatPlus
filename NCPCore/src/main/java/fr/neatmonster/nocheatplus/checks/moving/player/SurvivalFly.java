@@ -63,7 +63,6 @@ import fr.neatmonster.nocheatplus.utilities.collision.supportingblock.Supporting
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
-import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 import fr.neatmonster.nocheatplus.utilities.math.MathUtil;
 import fr.neatmonster.nocheatplus.utilities.math.TrigUtil;
 import fr.neatmonster.nocheatplus.utilities.moving.Magic;
@@ -93,30 +92,6 @@ public class SurvivalFly extends Check {
      * to calculate horizontal speed with, also affects the vertical speed (See comment in {@link fr.neatmonster.nocheatplus.utilities.location.RichEntityLocation#getFlowForceVector(int, int, int, long)}.
      */
     private double verticalLiquidPushComponent = 0.0;
-
-    /*
-     * Bedrock-only compatibility envelopes. Java Edition movement is deliberately
-     * left on the original SurvivalFly path; these are only used after
-     * pData.isBedrockPlayer() has matched a Geyser/Floodgate/permission-marked
-     * player. The values are empirical starting boundaries for the Bedrock false
-     * positives observed around partial block support and water/climbable packet
-     * differences.
-     */
-    private static final double BEDROCK_PARTIAL_SUPPORT_H_RESIDUAL = 0.18D;
-    private static final double BEDROCK_PARTIAL_SUPPORT_H_CAP = 0.95D;
-    private static final double BEDROCK_PARTIAL_SUPPORT_Y_RESIDUAL = 0.65D;
-    private static final double BEDROCK_PARTIAL_SUPPORT_Y_MIN = -0.625D;
-    private static final double BEDROCK_PARTIAL_SUPPORT_Y_MAX = 0.625D;
-    private static final double BEDROCK_CLIMBABLE_H_RESIDUAL = 0.08D;
-    private static final double BEDROCK_CLIMBABLE_H_CAP = 0.35D;
-    private static final double BEDROCK_CLIMBABLE_Y_RESIDUAL = 0.35D;
-    private static final double BEDROCK_CLIMBABLE_Y_MIN = -0.45D;
-    private static final double BEDROCK_CLIMBABLE_Y_MAX = 0.35D;
-    private static final double BEDROCK_WATER_H_RESIDUAL = 0.22D;
-    private static final double BEDROCK_WATER_H_CAP = 0.85D;
-    private static final double BEDROCK_WATER_Y_RESIDUAL = 0.24D;
-    private static final double BEDROCK_WATER_Y_MIN = -0.50D;
-    private static final double BEDROCK_WATER_Y_MAX = 0.42D;
     
     
     public SurvivalFly() {
@@ -236,15 +211,6 @@ public class SurvivalFly extends Check {
             final double[] res = vDistRel(player, from, fromOnGround, resetFrom, to, toOnGround, resetTo, thisMove.yDistance, isNormalOrPacketSplitMove, lastMove, data, pData, false, debug, useBlockChangeTracker );
             yAllowedDistance = res[0];
             yDistanceAboveLimit = res[1];
-        }
-        if (hDistanceAboveLimit > 0.0 || yDistanceAboveLimit > 0.0) {
-            final double[] bedrockRes = applyBedrockCompatibilityModels(player, from, to,
-                    hAllowedDistance, hDistanceAboveLimit, yAllowedDistance, yDistanceAboveLimit,
-                    thisMove, lastMove, pData);
-            hAllowedDistance = bedrockRes[0];
-            hDistanceAboveLimit = bedrockRes[1];
-            yAllowedDistance = bedrockRes[2];
-            yDistanceAboveLimit = bedrockRes[3];
         }
 
 
@@ -404,160 +370,6 @@ public class SurvivalFly extends Check {
                 && lastMove.toIsValid
                 && lastMove.yDistance < -Magic.GRAVITY_MIN
                 && thisMove.yDistance - lastMove.yDistance < -Magic.GRAVITY_MIN);
-    }
-
-    /**
-     * Bedrock support model: Geyser/Floodgate movement can disagree with Java
-     * support sampling on thin or partial blocks. Keep this behind Bedrock
-     * detection so Java movement remains reviewer-owned and client-precision based.
-     */
-    private double[] applyBedrockCompatibilityModels(final Player player,
-                                                     final PlayerLocation from, final PlayerLocation to,
-                                                     double hAllowedDistance, double hDistanceAboveLimit,
-                                                     double yAllowedDistance, double yDistanceAboveLimit,
-                                                     final PlayerMoveData thisMove, final PlayerMoveData lastMove,
-                                                     final IPlayerData pData) {
-        if (!pData.isBedrockPlayer() || Bridge1_9.isGliding(player)) {
-            return new double[] {hAllowedDistance, hDistanceAboveLimit, yAllowedDistance, yDistanceAboveLimit};
-        }
-        final boolean partialSupport = isBedrockPartialSupportContext(from, to, thisMove, lastMove);
-        final boolean climbable = isBedrockClimbableContext(from, to, thisMove);
-        final boolean water = isBedrockWaterContext(from, to, thisMove);
-        if (hDistanceAboveLimit > 0.0) {
-            if (partialSupport && acceptsBedrockHorizontalEnvelope(thisMove, hAllowedDistance,
-                    hDistanceAboveLimit, BEDROCK_PARTIAL_SUPPORT_H_RESIDUAL,
-                    BEDROCK_PARTIAL_SUPPORT_H_CAP, "bedrock_partial_support_h")) {
-                hAllowedDistance = thisMove.hAllowedDistance;
-                hDistanceAboveLimit = 0.0;
-            }
-            else if (climbable && acceptsBedrockHorizontalEnvelope(thisMove, hAllowedDistance,
-                    hDistanceAboveLimit, BEDROCK_CLIMBABLE_H_RESIDUAL,
-                    BEDROCK_CLIMBABLE_H_CAP, "bedrock_climbable_h")) {
-                hAllowedDistance = thisMove.hAllowedDistance;
-                hDistanceAboveLimit = 0.0;
-            }
-            else if (water && acceptsBedrockHorizontalEnvelope(thisMove, hAllowedDistance,
-                    hDistanceAboveLimit, BEDROCK_WATER_H_RESIDUAL,
-                    BEDROCK_WATER_H_CAP, "bedrock_water_h")) {
-                hAllowedDistance = thisMove.hAllowedDistance;
-                hDistanceAboveLimit = 0.0;
-            }
-            else if (partialSupport || climbable || water) {
-                tags.add("bedrock_h_model_miss");
-            }
-        }
-        if (yDistanceAboveLimit > 0.0) {
-            if (partialSupport && acceptsBedrockVerticalEnvelope(thisMove, yDistanceAboveLimit,
-                    BEDROCK_PARTIAL_SUPPORT_Y_MIN, BEDROCK_PARTIAL_SUPPORT_Y_MAX,
-                    BEDROCK_PARTIAL_SUPPORT_Y_RESIDUAL, BEDROCK_PARTIAL_SUPPORT_H_CAP,
-                    "bedrock_partial_support_y")) {
-                yAllowedDistance = thisMove.yAllowedDistance;
-                yDistanceAboveLimit = 0.0;
-            }
-            else if (climbable && acceptsBedrockVerticalEnvelope(thisMove, yDistanceAboveLimit,
-                    BEDROCK_CLIMBABLE_Y_MIN, BEDROCK_CLIMBABLE_Y_MAX,
-                    BEDROCK_CLIMBABLE_Y_RESIDUAL, BEDROCK_CLIMBABLE_H_CAP,
-                    "bedrock_climbable_y")) {
-                yAllowedDistance = thisMove.yAllowedDistance;
-                yDistanceAboveLimit = 0.0;
-            }
-            else if (water && acceptsBedrockVerticalEnvelope(thisMove, yDistanceAboveLimit,
-                    BEDROCK_WATER_Y_MIN, BEDROCK_WATER_Y_MAX,
-                    BEDROCK_WATER_Y_RESIDUAL, BEDROCK_WATER_H_CAP,
-                    "bedrock_water_y")) {
-                yAllowedDistance = thisMove.yAllowedDistance;
-                yDistanceAboveLimit = 0.0;
-            }
-            else if (partialSupport || climbable || water) {
-                tags.add("bedrock_y_model_miss");
-            }
-        }
-        return new double[] {hAllowedDistance, hDistanceAboveLimit, yAllowedDistance, yDistanceAboveLimit};
-    }
-
-    private boolean acceptsBedrockHorizontalEnvelope(final PlayerMoveData thisMove,
-                                                    final double hAllowedDistance,
-                                                    final double hDistanceAboveLimit,
-                                                    final double residual,
-                                                    final double moveCap,
-                                                    final String tag) {
-        final double modelLimit = Math.max(hAllowedDistance, Math.min(moveCap, hAllowedDistance + residual));
-        if (thisMove.hDistance <= modelLimit + Magic.PREDICTION_EPSILON
-                && hDistanceAboveLimit <= residual + Magic.PREDICTION_EPSILON) {
-            thisMove.hAllowedDistance = modelLimit;
-            tags.add(tag);
-            return true;
-        }
-        return false;
-    }
-
-    private boolean acceptsBedrockVerticalEnvelope(final PlayerMoveData thisMove,
-                                                  final double yDistanceAboveLimit,
-                                                  final double minY,
-                                                  final double maxY,
-                                                  final double residual,
-                                                  final double horizontalCap,
-                                                  final String tag) {
-        if (thisMove.yDistance >= minY
-                && thisMove.yDistance <= maxY
-                && thisMove.hDistance <= horizontalCap
-                && yDistanceAboveLimit <= residual + Magic.PREDICTION_EPSILON) {
-            /*
-             * Existing SurvivalFly violation math expects one allowed value. The
-             * Bedrock envelope has already accepted the actual packet, so normalize
-             * the remaining residual for that legacy result path.
-             */
-            thisMove.yAllowedDistance = thisMove.yDistance;
-            tags.add(tag);
-            return true;
-        }
-        return false;
-    }
-
-    private boolean isBedrockPartialSupportContext(final PlayerLocation from, final PlayerLocation to,
-                                                   final PlayerMoveData thisMove, final PlayerMoveData lastMove) {
-        if (!isBedrockPartialSupportNear(from) && !isBedrockPartialSupportNear(to)) {
-            return false;
-        }
-        return thisMove.touchedGround || thisMove.touchedGroundWorkaround
-                || thisMove.from.onGroundOrResetCond || thisMove.to.onGroundOrResetCond
-                || lastMove.toIsValid && (lastMove.to.onGroundOrResetCond || lastMove.touchedGround)
-                || from.isOnGround(0.65D, 0.05D, 0.05D)
-                || to.isOnGround(0.65D, 0.05D, 0.05D);
-    }
-
-    private boolean isBedrockPartialSupportNear(final PlayerLocation loc) {
-        return isBedrockPartialSupportBlock(loc.getBlockType())
-                || isBedrockPartialSupportBlock(loc.getBlockTypeBelow())
-                || isBedrockPartialSupportBlock(loc.getBlockType(loc.getBlockX(), loc.getBlockY() + 1, loc.getBlockZ()));
-    }
-
-    private boolean isBedrockPartialSupportBlock(final Material mat) {
-        if (mat == null) {
-            return false;
-        }
-        final long flags = BlockFlags.getBlockFlags(mat);
-        return (flags & (BlockFlags.F_STAIRS | BlockFlags.F_CARPET | BlockFlags.F_SCAFFOLDING | BlockFlags.F_POWDER_SNOW)) != 0
-                || MaterialUtil.SLABS.contains(mat)
-                || MaterialUtil.LANTERNS.contains(mat)
-                || mat == Material.SNOW;
-    }
-
-    private boolean isBedrockClimbableContext(final PlayerLocation from, final PlayerLocation to,
-                                              final PlayerMoveData thisMove) {
-        return from.isOnClimbable() || to.isOnClimbable()
-                || thisMove.from.onClimbable || thisMove.to.onClimbable
-                || isBedrockClimbableBlock(from.getBlockType())
-                || isBedrockClimbableBlock(to.getBlockType());
-    }
-
-    private boolean isBedrockClimbableBlock(final Material mat) {
-        return mat != null && (BlockFlags.getBlockFlags(mat) & (BlockFlags.F_CLIMBABLE | BlockFlags.F_SCAFFOLDING)) != 0;
-    }
-
-    private boolean isBedrockWaterContext(final PlayerLocation from, final PlayerLocation to,
-                                          final PlayerMoveData thisMove) {
-        return from.isInWater() || to.isInWater() || thisMove.from.inWater || thisMove.to.inWater;
     }
     
     
@@ -772,7 +584,9 @@ public class SurvivalFly extends Check {
         }
         else {
             hDistanceAboveLimit = Math.max(hDistanceAboveLimit, offsetH);
-            tags.add("hdistrel");
+            if (hDistanceAboveLimit > 0.0) {
+                tags.add("hdistrel");
+            }
         }
         if (debug) {
             player.sendMessage(ChatColor.RED + "[SurvivalFly] vdistrel: predict=" + StringUtil.fdec6.format(thisMove.yAllowedDistance) + ", actual=" + StringUtil.fdec6.format(thisMove.yDistance) + ", offset=" + StringUtil.fdec6.format(offsetV));
@@ -944,6 +758,8 @@ public class SurvivalFly extends Check {
             hDistanceAboveLimit = handlePredictableMove(thisMove, cc.survivalFlyStrictHorizontal); 
         }
         else hDistanceAboveLimit = handleUnpredictableMove(thisMove, cc.survivalFlyStrictHorizontal);
+        hDistanceAboveLimit = applyEdgeCornerResolvedTolerance(thisMove, hDistanceAboveLimit, cc.survivalFlyStrictHorizontal);
+        hDistanceAboveLimit = HiddenMotionReconstructor.applyEdgeSneakBypass(player, pData, data, from, lastMove, thisMove, hDistanceAboveLimit, tags);
         if (hDistanceAboveLimit > 0.0) {
             tags.add("hdistrel");
             if (debug) {
@@ -1130,158 +946,16 @@ public class SurvivalFly extends Check {
             }
         }
 
-
-        //////////////////////////////////////
-        // Next move for the client         //
-        //////////////////////////////////////
-        /*
-          All moves are assumed to be predictable, unless we explicitly state otherwise. 
-          A move is considered to be predictable if there aren't any particular client-side issues/limitations that prevent it.
-         */
-        boolean isPredictable = true;
-        // Initialize the allowed distance(s) with the previous speed. (Only if we have end-point coordinates)
-        // This essentially represents the momentum of the player.
-        thisMove.xAllowedDistance = lastMove.toIsValid ? lastMove.xDistance : 0.0;
-        thisMove.zAllowedDistance = lastMove.toIsValid ? lastMove.zDistance : 0.0;
-        // !lastMove.possibleStopMotion is dummy flag to flip false on failure and retry
-        // Check if there had been a hidden move on the prebious tick(s) due to 0.03 threshold.
-        // If so, the initial speed is initialized by the corrected distance. xDistance/zDistance would report a wrong speed value.
-        if (!lastMove.possibleStopMotion && (lastMove.xCorrectedDistancePre != 0.0 || lastMove.zCorrectedDistancePre != 0.0)) {
-            thisMove.xAllowedDistance = lastMove.xCorrectedDistancePre;
-            thisMove.zAllowedDistance = lastMove.zCorrectedDistancePre;
-            // Distinguish source of CorrectedDistance that only come from hidden move not from stop motion
-            if (lastMove.hiddenDistanceIndex != -1) {
-                thisMove.possibleStopMotion = true;
-            }
-            tags.add("hidden");
-        }
-        // If the player collided with something on the previous tick, start with 0 momentum now.
-        doWallCollision(lastMove, thisMove);
-        // (The game calls a checkFallDamage() function, which, as you can imagine, handles fall damage. But also handles liquids' flow force, thus we need to apply this 2 times.)
-        if (from.isInWater() && !lastMove.from.inWater) {
-            Vector liquidFlowVector = from.getLiquidPushingVector(thisMove.xAllowedDistance, thisMove.zAllowedDistance, BlockFlags.F_WATER);
-            thisMove.xAllowedDistance += liquidFlowVector.getX();
-            thisMove.zAllowedDistance += liquidFlowVector.getZ();
-        }
-        // Slime speed
-        if (from.isOnSlimeBlock() && onGround) {
-            /*
-             * Specific issue with slime speed: the client tries to fall down with -0.0784 gravity, and then bounce back up to 0 >=. Ground status is set to false then.
-             * However, if the bounce-back is smaller than 0.0784, we don't see it on the server-side; we always see the player as being on ground with 0 dist; the multiplier can range from 0.4 to 0.45, depending on the y motion.
-             * In other words, this movement is effectively hidden and cannot be predicted, likewise isVerticallyConstricted()...
-             * Our solution: always assume the multiplier to be at maximum and allow speed lower than that (in other words, just set a limit). 
-             * 
-             * Assume it to be a bug. Mojang is never going to fix this stuff anyway.
-             */
-            if (Math.abs(lastMove.yDistance) < 0.1 && !pData.isShiftKeyPressed()) {
-                if (thisMove.yDistance == 0.0) {
-                    // Mojang... Why did you have to make the multiplier dependent on vertical motion, why...
-                    isPredictable = false;
-                    thisMove.xAllowedDistance *= 0.67; // From testing: 0.6 was too little, while 0.7 a bit too much
-                    thisMove.zAllowedDistance *= 0.67;
-                }
-                else {
-                    // Otherwise, do attempt to predict. Hopefully this works.
-                    thisMove.xAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                    thisMove.zAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                }
-                /*
-                 * 
-                 * For reference: this does not *always* work. Need to test it further.
-                 * Bukkit's getVelocity() does actually report the hidden velocity, but it seems to be behind a tick or something.
-                 * (In fact, getVelocity() seems to moreso represent the player's momentum than their current speed)
-                 * 
-                 * if (thisMove.yDistance == 0.0) {
-                 *     Vector bukkitMomentum = player.getVelocity().clone();
-                 *     thisMove.xAllowedDistance *= 0.4 + Math.abs(bukkitMomentum.getY()) * 0.2;
-                 *     thisMove.zAllowedDistance *= 0.4 + Math.abs(bukkitMomentum.getY()) * 0.2;
-                 * }
-                 * else {
-                 *    thisMove.xAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                 *    thisMove.zAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                 * }
-                 * 
-                 */
-            }
-        }
-        // Sliding speed (honey block)
-        if (from.isSlidingDown()) { // TODO: lastMove.from.slideDown or something?
-            if (lastMove.yDistance < -Magic.SLIDE_START_AT_VERTICAL_MOTION_THRESHOLD) {
-                thisMove.xAllowedDistance *= -Magic.SLIDE_SPEED_THROTTLE / lastMove.yDistance;
-                thisMove.zAllowedDistance *= -Magic.SLIDE_SPEED_THROTTLE / lastMove.yDistance;
-            }
-        }
-        // Stuck speed reset (the game resets momentum each tick the player is in a stuck-speed block)
-        if (data.lastStuckInBlockHorizontal != 1.0) {
-            if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) { // (Vanilla check, don't ask)
-                // Throttle speed if stuck in.
-                thisMove.xAllowedDistance = thisMove.zAllowedDistance = 0.0;
-            }
-        }
-        
-        // Block speed
-        thisMove.xAllowedDistance *= (double) data.nextBlockSpeedMultiplier;
-        thisMove.zAllowedDistance *= (double) data.nextBlockSpeedMultiplier;
-        // Friction next, with special case for riptide at the start of the movement tick (when the riptide move is "unified" and not split into two updates; friction of the next move is used here)
-        boolean newFriction = false;
-        if (lastMove.tridentRelease.decide() && lastMove.toIsValid) {
-            final PlayerMoveData secondLastMove = data.playerMoves.getSecondPastMove();
-            if (lastMove.from.onGround || secondLastMove.tridentRelease.decideOptimistically() 
-                || (secondLastMove.toIsValid && secondLastMove.yDistance <= 0.0 && (secondLastMove.from.onGround || secondLastMove.fromLostGround))) {
-                newFriction = true;
-            }
-        }
-        thisMove.xAllowedDistance *= (double) (newFriction ? data.nextInertia : data.lastInertia);
-        thisMove.zAllowedDistance *= (double) (newFriction ? data.nextInertia : data.lastInertia);
-        // Apply entity-pushing speed
-        // From Entity.java.push()
-        // The entity's location is in the past.
-        if (player.getGameMode() != BridgeMisc.GAME_MODE_SPECTATOR) { // noPhysics check in vanilla.
-            Vector push = from.doPush(new Vector(thisMove.xAllowedDistance, 0.0, thisMove.zAllowedDistance));
-            thisMove.xAllowedDistance = push.getX();
-            thisMove.zAllowedDistance = push.getZ();
-            if (data.lastCollidingEntitiesLocations != null && !data.lastCollidingEntitiesLocations.isEmpty()) {
-                isPredictable = false;
-            }
-        }
-
-
-
-        //////////////////////////////////
-        // Last move for the client     //
-        //////////////////////////////////
-        // See CombinedListener.java for more details
-        // This is done before liquid pushing...
-        if (thisMove.hasAttackSlowDown) {
-            thisMove.zAllowedDistance *= Magic.ATTACK_SLOWDOWN;
-            thisMove.xAllowedDistance *= Magic.ATTACK_SLOWDOWN;
-        }
-        // Apply liquid pushing speed (2nd call).
-        if (from.isInLiquid()) {
-            Vector liquidFlowVector = from.getLiquidPushingVector(thisMove.xAllowedDistance, thisMove.zAllowedDistance, from.isInWater() ? BlockFlags.F_WATER : BlockFlags.F_LAVA);
-            thisMove.xAllowedDistance += liquidFlowVector.getX();
-            verticalLiquidPushComponent = liquidFlowVector.getY();
-            thisMove.zAllowedDistance += liquidFlowVector.getZ();
-        }
-        // Before calculating the acceleration, check if momentum is below the negligible speed threshold and cancel it.
-        checkNegligibleMomentum(pData, thisMove);
-        // Sprint-jumping...
-        // IMPORTANT NOTE: when working **exclusively** with rotations (like in the following cases), you must use the TO location, not the FROM one, as TO contains the most recent rotation. Using FROM lags behind a few ticks, causing false positives when switching looking direction.
-        if (PhysicsEnvelope.isBunnyhop(from, to, pData, fromOnGround, toOnGround, player, forceSetOffGround)) {
-            thisMove.xAllowedDistance += (double) (-TrigUtil.sin(to.getYaw() * TrigUtil.toRadians) * Magic.BUNNYHOP_BOOST);
-            thisMove.zAllowedDistance += (double) (TrigUtil.cos(to.getYaw() * TrigUtil.toRadians) * Magic.BUNNYHOP_BOOST);
-            thisMove.bunnyHop = true;
-            tags.add("bunnyhop");
-        }
-        
         /*
          * This bit of vertical distance computation is needed for the supporting block mechanism, which needs Minecraft-calculated on-ground status.
          * Normally, these would be computed at the same time, however, since NCP handles horizontal and vertical speed estimation separately, we need to duplicate this bit of code here.
          * TODO: Unify predictions somehow.
          */
-        // Current yDistance before calculation for supporting block ground state. Copy paste from vDistrel
         double yDistanceBeforeCollide = lastMove.toIsValid ? lastMove.yDistance : 0.0;
-        if (lastMove.yCorrectedDistancePre != 0.0) yDistanceBeforeCollide = lastMove.yCorrectedDistancePre;
+        if (lastMove.yCorrectedDistancePre != 0.0) {
+            yDistanceBeforeCollide = lastMove.yCorrectedDistancePre;
+        }
+        // Refine yDistanceBeforeCollide (seed set above for edge-sneak momentum carry).
         if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) {
             if (data.lastStuckInBlockVertical != 1.0) {
                 yDistanceBeforeCollide = 0.0;
@@ -1350,7 +1024,7 @@ public class SurvivalFly extends Check {
                 yDistanceBeforeCollide -= Magic.LIQUID_SPEED_GAIN;
             }
         }
-        if (yDistanceBeforeCollide < (pData.getClientVersion().isHigherThan(ClientVersion.V_1_12_2) ? 0.003 : 0.005)) yDistanceBeforeCollide = 0.0;
+        if (Math.abs(yDistanceBeforeCollide) < (pData.getClientVersion().isHigherThan(ClientVersion.V_1_12_2) ? 0.003 : 0.005)) yDistanceBeforeCollide = 0.0;
         if (!from.isInLiquid() && from.isOnClimbable() && from.canClimbUp(data.liftOffEnvelope.getMaxJumpHeight(data.jumpAmplifier))) {
             // Should replicate the condition: !this.getInBlockState().is(Blocks.SCAFFOLDING)
             final Material typeId = from.getBlockType();
@@ -1362,6 +1036,175 @@ public class SurvivalFly extends Check {
             }
         }
         //End of yDistanceBeforeCollide getter
+
+        //////////////////////////////////////
+        // Next move for the client         //
+        //////////////////////////////////////
+        /*
+          All moves are assumed to be predictable, unless we explicitly state otherwise. 
+          A move is considered to be predictable if there aren't any particular client-side issues/limitations that prevent it.
+         */
+        boolean isPredictable = true;
+        final boolean edgeSneakNow = !player.isFlying() && pData.isShiftKeyPressed() && from.isAboveGround() && yDistanceBeforeCollide <= 0.0;
+        // Initialize horizontal momentum; at an edge use stored internal momentum while still shift-sneaking.
+        if (lastMove.toIsValid) {
+            if (edgeSneakNow && lastMove.edgeBackoffApplied) {
+                thisMove.xAllowedDistance = lastMove.motionX;
+                thisMove.zAllowedDistance = lastMove.motionZ;
+            } else if (HiddenMotionReconstructor.shouldUseEdgeHiddenCarry(edgeSneakNow, from, yDistanceBeforeCollide, lastMove)) {
+                thisMove.xAllowedDistance = lastMove.motionX;
+                thisMove.zAllowedDistance = lastMove.motionZ;
+            } else {
+                thisMove.xAllowedDistance = lastMove.xDistance;
+                thisMove.zAllowedDistance = lastMove.zDistance;
+            }
+            // Edge: packet may show 0 on a clipped axis while internal momentum (motionX/Z) is still large.
+            if (lastMove.edgeBackoffApplied && lastMove.edgeAxisClamped) {
+                final double pktSuppressH = HiddenMotionReconstructor.packetSuppressThresholdH(pData);
+                if (Math.abs(lastMove.xDistance) < pktSuppressH) {
+                    thisMove.xAllowedDistance = lastMove.motionX;
+                }
+                if (Math.abs(lastMove.zDistance) < pktSuppressH) {
+                    thisMove.zAllowedDistance = lastMove.motionZ;
+                }
+            }
+        } else {
+            thisMove.xAllowedDistance = 0.0;
+            thisMove.zAllowedDistance = 0.0;
+        }
+        // !lastMove.possibleStopMotion is dummy flag to flip false on failure and retry
+        // Check if there had been a hidden move on the prebious tick(s) due to 0.03 threshold.
+        // If so, the initial speed is initialized by the corrected distance. xDistance/zDistance would report a wrong speed value.
+        if (!lastMove.possibleStopMotion && (lastMove.xCorrectedDistancePre != 0.0 || lastMove.zCorrectedDistancePre != 0.0)) {
+            // Edge-sneak internal momentum overrides generic hidden pre-correct when still at an edge.
+            if (!(edgeSneakNow && lastMove.edgeBackoffApplied)) {
+                thisMove.xAllowedDistance = lastMove.xCorrectedDistancePre;
+                thisMove.zAllowedDistance = lastMove.zCorrectedDistancePre;
+                // Distinguish source of CorrectedDistance that only come from hidden move not from stop motion
+                if (lastMove.hiddenDistanceIndex != -1) {
+                    thisMove.possibleStopMotion = true;
+                }
+                tags.add("hidden");
+            }
+        }
+        // Stuck speed reset (the game resets momentum each tick the player is in a stuck-speed block)
+        if (data.lastStuckInBlockHorizontal != 1.0) {
+            if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) { // (Vanilla check, don't ask)
+                // Throttle speed if stuck in.
+                thisMove.xAllowedDistance = thisMove.zAllowedDistance = 0.0;
+            }
+        }
+        // If the player collided with something on the previous tick, start with 0 momentum now.
+        doWallCollision(lastMove, thisMove);
+        // (The game calls a checkFallDamage() function, which, as you can imagine, handles fall damage. But also handles liquids' flow force, thus we need to apply this 2 times.)
+        if (from.isInWater() && !lastMove.from.inWater) {
+            Vector liquidFlowVector = from.getLiquidPushingVector(thisMove.xAllowedDistance, thisMove.zAllowedDistance, BlockFlags.F_WATER);
+            thisMove.xAllowedDistance += liquidFlowVector.getX();
+            thisMove.zAllowedDistance += liquidFlowVector.getZ();
+        }
+        // Slime speed
+        if (from.isOnSlimeBlock() && onGround) {
+            /*
+             * Specific issue with slime speed: the client tries to fall down with -0.0784 gravity, and then bounce back up to 0 >=. Ground status is set to false then.
+             * However, if the bounce-back is smaller than 0.0784, we don't see it on the server-side; we always see the player as being on ground with 0 dist; the multiplier can range from 0.4 to 0.45, depending on the y motion.
+             * In other words, this movement is effectively hidden and cannot be predicted, likewise isVerticallyConstricted()...
+             * Our solution: always assume the multiplier to be at maximum and allow speed lower than that (in other words, just set a limit). 
+             * 
+             * Assume it to be a bug. Mojang is never going to fix this stuff anyway.
+             */
+            if (Math.abs(lastMove.yDistance) < 0.1 && !pData.isShiftKeyPressed()) {
+                if (thisMove.yDistance == 0.0) {
+                    // Mojang... Why did you have to make the multiplier dependent on vertical motion, why...
+                    isPredictable = false;
+                    thisMove.xAllowedDistance *= 0.67; // From testing: 0.6 was too little, while 0.7 a bit too much
+                    thisMove.zAllowedDistance *= 0.67;
+                }
+                else {
+                    // Otherwise, do attempt to predict. Hopefully this works.
+                    thisMove.xAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
+                    thisMove.zAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
+                }
+                /*
+                 * 
+                 * For reference: this does not *always* work. Need to test it further.
+                 * Bukkit's getVelocity() does actually report the hidden velocity, but it seems to be behind a tick or something.
+                 * (In fact, getVelocity() seems to moreso represent the player's momentum than their current speed)
+                 * 
+                 * if (thisMove.yDistance == 0.0) {
+                 *     Vector bukkitMomentum = player.getVelocity().clone();
+                 *     thisMove.xAllowedDistance *= 0.4 + Math.abs(bukkitMomentum.getY()) * 0.2;
+                 *     thisMove.zAllowedDistance *= 0.4 + Math.abs(bukkitMomentum.getY()) * 0.2;
+                 * }
+                 * else {
+                 *    thisMove.xAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
+                 *    thisMove.zAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
+                 * }
+                 * 
+                 */
+            }
+        }
+        // Sliding speed (honey block)
+        if (from.isSlidingDown()) { // TODO: lastMove.from.slideDown or something?
+            if (lastMove.yDistance < -Magic.SLIDE_START_AT_VERTICAL_MOTION_THRESHOLD) {
+                thisMove.xAllowedDistance *= -Magic.SLIDE_SPEED_THROTTLE / lastMove.yDistance;
+                thisMove.zAllowedDistance *= -Magic.SLIDE_SPEED_THROTTLE / lastMove.yDistance;
+            }
+        }
+        
+        // Block speed
+        thisMove.xAllowedDistance *= (double) data.nextBlockSpeedMultiplier;
+        thisMove.zAllowedDistance *= (double) data.nextBlockSpeedMultiplier;
+        // Friction next, with special case for riptide at the start of the movement tick (when the riptide move is "unified" and not split into two updates; friction of the next move is used here)
+        boolean newFriction = false;
+        if (lastMove.tridentRelease.decide() && lastMove.toIsValid) {
+            final PlayerMoveData secondLastMove = data.playerMoves.getSecondPastMove();
+            if (lastMove.from.onGround || secondLastMove.tridentRelease.decideOptimistically() 
+                || (secondLastMove.toIsValid && secondLastMove.yDistance <= 0.0 && (secondLastMove.from.onGround || secondLastMove.fromLostGround))) {
+                newFriction = true;
+            }
+        }
+        thisMove.xAllowedDistance *= (double) (newFriction ? data.nextInertia : data.lastInertia);
+        thisMove.zAllowedDistance *= (double) (newFriction ? data.nextInertia : data.lastInertia);
+        // Apply entity-pushing speed
+        // From Entity.java.push()
+        // The entity's location is in the past.
+        if (player.getGameMode() != BridgeMisc.GAME_MODE_SPECTATOR) { // noPhysics check in vanilla.
+            Vector push = from.doPush(new Vector(thisMove.xAllowedDistance, 0.0, thisMove.zAllowedDistance));
+            thisMove.xAllowedDistance = push.getX();
+            thisMove.zAllowedDistance = push.getZ();
+            if (data.lastCollidingEntitiesLocations != null && !data.lastCollidingEntitiesLocations.isEmpty()) {
+                isPredictable = false;
+            }
+        }
+
+
+
+        //////////////////////////////////
+        // Last move for the client     //
+        //////////////////////////////////
+        // See CombinedListener.java for more details
+        // This is done before liquid pushing...
+        if (thisMove.hasAttackSlowDown) {
+            thisMove.zAllowedDistance *= Magic.ATTACK_SLOWDOWN;
+            thisMove.xAllowedDistance *= Magic.ATTACK_SLOWDOWN;
+        }
+        // Apply liquid pushing speed (2nd call).
+        if (from.isInLiquid()) {
+            Vector liquidFlowVector = from.getLiquidPushingVector(thisMove.xAllowedDistance, thisMove.zAllowedDistance, from.isInWater() ? BlockFlags.F_WATER : BlockFlags.F_LAVA);
+            thisMove.xAllowedDistance += liquidFlowVector.getX();
+            verticalLiquidPushComponent = liquidFlowVector.getY();
+            thisMove.zAllowedDistance += liquidFlowVector.getZ();
+        }
+        // Before calculating the acceleration, check if momentum is below the negligible speed threshold and cancel it.
+        checkNegligibleMomentum(pData, thisMove);
+        // Sprint-jumping...
+        // IMPORTANT NOTE: when working **exclusively** with rotations (like in the following cases), you must use the TO location, not the FROM one, as TO contains the most recent rotation. Using FROM lags behind a few ticks, causing false positives when switching looking direction.
+        if (PhysicsEnvelope.isBunnyhop(from, to, pData, fromOnGround, toOnGround, player, forceSetOffGround)) {
+            thisMove.xAllowedDistance += (double) (-TrigUtil.sin(to.getYaw() * TrigUtil.toRadians) * Magic.BUNNYHOP_BOOST);
+            thisMove.zAllowedDistance += (double) (TrigUtil.cos(to.getYaw() * TrigUtil.toRadians) * Magic.BUNNYHOP_BOOST);
+            thisMove.bunnyHop = true;
+            tags.add("bunnyhop");
+        }
 
         // *--------------------------------------------------------------------------------------------------------------------*
         // *--------- If we know the player's impulse, brute-forcing acceleration and everything after it isn't needed ---------* 
@@ -1415,10 +1258,20 @@ public class SurvivalFly extends Check {
             // Try to back off players from edges, if sneaking.
             // NOTE: this is after the riptiding propelling force.
             // NOTE: here the game uses isShiftKeyDown (so this is shifting not sneaking, using Bukkit's isShift is correct)
-            if (!player.isFlying() && pData.isShiftKeyPressed() && from.isAboveGround() && thisMove.yDistance <= 0.0) {
-                Vector backOff = from.maybeBackOffFromEdge(new Vector(thisMove.xAllowedDistance, yDistanceBeforeCollide, thisMove.zAllowedDistance));
+            if (edgeSneakNow) {
+                thisMove.edgeBackoffApplied = true;
+                final double preEdgeX = thisMove.xAllowedDistance;
+                final double preEdgeZ = thisMove.zAllowedDistance;
+                final double pktSuppressH = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                        ? Magic.Minecraft_minMoveSqDistance_legacy : Math.sqrt(Magic.Minecraft_minMoveSqDist_modern);
+                Vector backOff = from.maybeBackOffFromEdge(new Vector(preEdgeX, yDistanceBeforeCollide, preEdgeZ));
+                HiddenMotionReconstructor.storeEdgeHiddenMotion(thisMove, preEdgeX, preEdgeZ, backOff.getX(), backOff.getZ(), pktSuppressH);
                 thisMove.xAllowedDistance = backOff.getX();
                 thisMove.zAllowedDistance = backOff.getZ();
+                if (!thisMove.edgeAxisClamped) {
+                    thisMove.motionX = thisMove.xDistance;
+                    thisMove.motionZ = thisMove.zDistance;
+                }
             }
             // Collision next.
             // NOTE: Passing the unchecked y-distance is fine in this case. Vertical collision is checked with vdistrel (just separately).
@@ -1459,7 +1312,6 @@ public class SurvivalFly extends Check {
             // If-else instead of an early return... Matter of preference. This makes code slightly easier to look at, as it avoids yet another indentation
             return isPredictable;
         }
-        
         
         // *----------------------------------------------------------------------------------------------------*
         // *-------Can't know / read player inputs, loop through everything after looping the acceleration------*
@@ -1519,12 +1371,48 @@ public class SurvivalFly extends Check {
                 zTheoreticalDistance[i] += riptideVelocity.getZ();
             }
         }
-        if (!player.isFlying() && pData.isShiftKeyPressed() && from.isAboveGround() && thisMove.yDistance <= 0.0) {
+        
+        double[] xMotionBeforeEdge = new double[9];
+        double[] zMotionBeforeEdge = new double[9];
+        double[] xBackOffAfterEdge = new double[9];
+        double[] zBackOffAfterEdge = new double[9];
+        for (i = 0; i < 9; i++) {
+            xMotionBeforeEdge[i] = xTheoreticalDistance[i];
+            zMotionBeforeEdge[i] = zTheoreticalDistance[i];
+            xBackOffAfterEdge[i] = xTheoreticalDistance[i];
+            zBackOffAfterEdge[i] = zTheoreticalDistance[i];
+        }        
+        
+        final double hiddenThresholdSqBrute = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
+        final double hiddenThresholdHBrute = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? hiddenThresholdSqBrute : Math.sqrt(hiddenThresholdSqBrute);
+        boolean activeCornerClamp = false;
+        if (edgeSneakNow) {
+            thisMove.edgeBackoffApplied = true;
+            // Single backoff probe replaces back-to-back edgeStillClampsCorner + edgeStillClamps on the same vector.
+            final Vector seedBackOff = from.maybeBackOffFromEdge(new Vector(thisMove.xAllowedDistance, yDistanceBeforeCollide, thisMove.zAllowedDistance));
+            activeCornerClamp = HiddenMotionReconstructor.edgeStillClampsCornerCached(thisMove.xAllowedDistance,
+                    thisMove.zAllowedDistance, seedBackOff.getX(), seedBackOff.getZ());
+            if (!HiddenMotionReconstructor.edgeStillClampsCached(thisMove.xAllowedDistance,
+                    thisMove.zAllowedDistance, seedBackOff.getX(), seedBackOff.getZ())) {
+                thisMove.motionX = thisMove.xDistance;
+                thisMove.motionZ = thisMove.zDistance;
+            }
             for (i = 0; i < 9; i++) {
                 // TODO: Optimize. Brute forcing collisions with all 9 speed combinations will tank performance.
-                Vector backOff = from.maybeBackOffFromEdge(new Vector(xTheoreticalDistance[i], yDistanceBeforeCollide, zTheoreticalDistance[i]));
+                final double preEdgeX = xTheoreticalDistance[i];
+                final double preEdgeZ = zTheoreticalDistance[i];
+                Vector backOff = from.maybeBackOffFromEdge(new Vector(preEdgeX, yDistanceBeforeCollide, preEdgeZ));
+                HiddenMotionReconstructor.storeEdgeHiddenMotionCandidate(thisMove, xMotionBeforeEdge, zMotionBeforeEdge, i, preEdgeX, preEdgeZ, backOff.getX(), backOff.getZ(),
+                        thisMove.xDistance, thisMove.zDistance, hiddenThresholdHBrute);
+                xBackOffAfterEdge[i] = backOff.getX();
+                zBackOffAfterEdge[i] = backOff.getZ();
                 xTheoreticalDistance[i] = backOff.getX();
                 zTheoreticalDistance[i] = backOff.getZ();
+            }
+            if (HiddenMotionReconstructor.anyEdgeCandidateClipped(xMotionBeforeEdge, zMotionBeforeEdge, xBackOffAfterEdge, zBackOffAfterEdge)) {
+                thisMove.edgeAxisClamped = true;
             }
         }
         // TODO: Optimize. Brute forcing collisions with all 9 speed combinations will tank performance.
@@ -1577,7 +1465,12 @@ public class SurvivalFly extends Check {
            Otherwise, only the combined horizontal distance will be checked against the offset.
         */
         boolean strict = cc.survivalFlyStrictHorizontal;
-        final double hiddenThreshold = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2) ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
+        final double hiddenThresholdSq = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? Magic.Minecraft_minMoveSqDistance_legacy : Magic.Minecraft_minMoveSqDist_modern;
+        final double hiddenThresholdH = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? hiddenThresholdSq : Math.sqrt(hiddenThresholdSq);
+        final boolean yDistanceSuppressed = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                ? thisMove.yDistance < hiddenThresholdSq : thisMove.yDistance * thisMove.yDistance < hiddenThresholdSq;
         for (i = 0; i < 9; i++) {
             // If this theoretical candidate results in a post-collision horizontal
             // displacement smaller than the client's packet-suppression threshold,
@@ -1587,9 +1480,19 @@ public class SurvivalFly extends Check {
             // Note: if multiple candidates match, the last matching index will
             // overwrite earlier ones (thisMove.hiddenDistanceIndex holds only one
             // seed candidate).
-            if (!collideX[i] && !collideZ[i] && thisMove.yDistance < hiddenThreshold
-                && MathUtil.dist(xTheoreticalDistance[i], zTheoreticalDistance[i]) < hiddenThreshold) {
-                thisMove.hiddenDistanceIndex = i;
+            if (!collideX[i] && !collideZ[i] && yDistanceSuppressed) {
+                final double postH = MathUtil.dist(xTheoreticalDistance[i], zTheoreticalDistance[i]);
+                final boolean suppressedPost = pData.getClientVersion().isLowerThan(ClientVersion.V_1_18_2)
+                        ? postH < hiddenThresholdSq : postH * postH < hiddenThresholdSq;
+                final boolean edgeSuppressedPacket = thisMove.edgeBackoffApplied
+                        && (thisMove.hDistance < hiddenThresholdH
+                                || Math.abs(thisMove.xDistance) < hiddenThresholdH
+                                || Math.abs(thisMove.zDistance) < hiddenThresholdH)
+                        && i < xBackOffAfterEdge.length
+                        && (xBackOffAfterEdge[i] != xMotionBeforeEdge[i] || zBackOffAfterEdge[i] != zMotionBeforeEdge[i]);
+                if (suppressedPost || edgeSuppressedPacket) {
+                    thisMove.hiddenDistanceIndex = i;
+                }
             }
             if (strict) {
                 if (MathUtil.almostEqual(thisMove.xDistance, xTheoreticalDistance[i], Magic.PREDICTION_EPSILON) 
@@ -1646,39 +1549,53 @@ public class SurvivalFly extends Check {
             // will return cumulative displacements for the hidden ticks. Those
             // results are then folded into the theoretical distances or stored
             // in the "corrected distance" fields for use across ticks.
-            if (thisMove.hiddenDistanceIndex != -1) {
-                final double result[] = HiddenMotionReconstructor.findBestHiddenTickExplanation(sinYaw, cosYaw, movementSpeed, theorInputs[thisMove.hiddenDistanceIndex], xTheoreticalDistance[thisMove.hiddenDistanceIndex], zTheoreticalDistance[thisMove.hiddenDistanceIndex], data, pData, from, pData.isInCrouchingPose(), attributeAccess.getHandle().getPlayerSneakingFactor(player), BridgeMisc.isSlowedDownByUsingAnItem(player), onGround, xTheoreticalDistance[thisMove.hiddenDistanceIndex], zTheoreticalDistance[thisMove.hiddenDistanceIndex]);
-                if (thisMove.xDistance == 0 && thisMove.zDistance == 0) {
-                    thisMove.xCorrectedDistancePost = xTheoreticalDistance[thisMove.hiddenDistanceIndex];
-                    thisMove.zCorrectedDistancePost = zTheoreticalDistance[thisMove.hiddenDistanceIndex];
-                    xTheoreticalDistance[thisMove.hiddenDistanceIndex] = 0.0;
-                    zTheoreticalDistance[thisMove.hiddenDistanceIndex] = 0.0;
-                    tags.add("hdistzero");                  
-                } 
-                else {
-                    xTheoreticalDistance[thisMove.hiddenDistanceIndex] += result[0];
-                    zTheoreticalDistance[thisMove.hiddenDistanceIndex] += result[1];
-                }
-                if (strict) {
-                    if (MathUtil.almostEqual(thisMove.xDistance, xTheoreticalDistance[thisMove.hiddenDistanceIndex], Magic.PREDICTION_EPSILON) 
-                        && MathUtil.almostEqual(thisMove.zDistance, zTheoreticalDistance[thisMove.hiddenDistanceIndex], Magic.PREDICTION_EPSILON)) {
-                        i = thisMove.hiddenDistanceIndex;
-                        thisMove.xCorrectedDistancePre = result[0];
-                        thisMove.zCorrectedDistancePre = result[1];
-                        found = true;
+            int hiddenSeed = thisMove.hiddenDistanceIndex;
+            if (hiddenSeed < 0 && thisMove.edgeBackoffApplied
+                    && (lastMove.edgeAxisClamped || lastMove.edgeCornerResolved
+                            || lastMove.xCorrectedDistancePost != 0.0 || lastMove.zCorrectedDistancePost != 0.0
+                            || Math.abs(thisMove.xDistance) < hiddenThresholdH
+                            || Math.abs(thisMove.zDistance) < hiddenThresholdH)) {
+                hiddenSeed = MathUtil.findClosestHorizontalIndex(xTheoreticalDistance, zTheoreticalDistance, thisMove.xDistance, thisMove.zDistance);
+            }
+            if (hiddenSeed >= 0 && !thisMove.edgeBackoffApplied) {
+                final int hiddenResolved = tryFoldHiddenTickExplanation(player, hiddenSeed, xTheoreticalDistance, zTheoreticalDistance,
+                        xMotionBeforeEdge, zMotionBeforeEdge, theorInputs, sinYaw, cosYaw, movementSpeed, data, pData, from, onGround,
+                        yDistanceBeforeCollide, strict, tags);
+                if (hiddenResolved >= 0) {
+                    i = hiddenResolved;
+                    found = true;
+                    if (thisMove.edgeBackoffApplied) {
+                        tags.add("edge_hidden");
                     }
                 }
-                else {
-                    double theoreticalHDistance = MathUtil.dist(xTheoreticalDistance[thisMove.hiddenDistanceIndex], zTheoreticalDistance[thisMove.hiddenDistanceIndex]);
-                    if (MathUtil.almostEqual(theoreticalHDistance, thisMove.hDistance, Magic.PREDICTION_EPSILON)) {
-                        i = thisMove.hiddenDistanceIndex;
-                        found = true;
-                    }
-                }
-            } 
+            }
             else if (lastMove.hiddenDistanceIndex != -1 && (lastMove.xCorrectedDistancePre != 0 || lastMove.zCorrectedDistancePre != 0)) {
                 // Hidden move was found and sum match lastMove but the component of the sum didn't right as there another direction that also make the sum correct!
                 isPredictable = false;
+            }
+            if (!found && thisMove.edgeBackoffApplied && activeCornerClamp) {
+                double cornerRefSpeed = thisMove.hDistance;
+                for (int c = 0; c < 9; c++) {
+                    cornerRefSpeed = Math.max(cornerRefSpeed, MathUtil.dist(xTheoreticalDistance[c], zTheoreticalDistance[c]));
+                    cornerRefSpeed = Math.max(cornerRefSpeed, MathUtil.dist(xBackOffAfterEdge[c], zBackOffAfterEdge[c]));
+                }
+                final double cornerMatchTolerance = HiddenMotionReconstructor.edgeCornerMatchTolerance(cornerRefSpeed);
+                final int cornerIdx = HiddenMotionReconstructor.findBestEdgeCornerCandidate(thisMove.xDistance, thisMove.zDistance, thisMove.hDistance,
+                        xTheoreticalDistance, zTheoreticalDistance, xBackOffAfterEdge, zBackOffAfterEdge, strict, cornerMatchTolerance);
+                if (cornerIdx >= 0) {
+                    i = cornerIdx;
+                    found = true;
+                    isPredictable = false;
+                    thisMove.edgeCornerResolved = true;
+                    tags.add("edge_corner");
+                    if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_20)) {
+                        pData.setSupportingBlockData(SupportingBlockUtils.checkSupportingBlock(to.getBlockCache(), player, pData.getSupportingBlockData(), new Vector(xTheoreticalDistance[i], thisMove.yDistance, zTheoreticalDistance[i]), to.getBoundingBox(), collideY[i] && yDistanceBeforeCollide < 0.0));
+                    }
+                    thisMove.collideX = collideX[i];
+                    thisMove.collideZ = collideZ[i];
+                    thisMove.collidesHorizontally = thisMove.collideX || thisMove.collideZ;
+                    thisMove.negligibleHorizontalCollision = thisMove.collidesHorizontally && CollisionUtil.isHorizontalCollisionNegligible(new Vector(xTheoreticalDistance[i], thisMove.yDistance, zTheoreticalDistance[i]), to, theorInputs[i].getStrafe(), theorInputs[i].getForward());
+                }
             }
         }
         //////////////////////////////////////////////////////////////
@@ -1696,23 +1613,130 @@ public class SurvivalFly extends Check {
         // TODO: How can we know the impulse if the move is uncertain? ...
         if (!isPredictable) {
             // In this case, instead of setting the predicted speed with the smallest delta from the actual speed (0.0001), we select the speed that is closest to the current one, effectively allowing for the maximum predicted speed (just limits speed then).
-            xIdx = MathUtil.findClosestIndex(xTheoreticalDistance, thisMove.xDistance);
-            zIdx = MathUtil.findClosestIndex(zTheoreticalDistance, thisMove.zDistance);
+            if (thisMove.edgeBackoffApplied && activeCornerClamp) {
+                // Corner: both axes clipped on the actual seed; one combined candidate for packet match.
+                xIdx = MathUtil.findClosestHorizontalIndex(xTheoreticalDistance, zTheoreticalDistance, thisMove.xDistance, thisMove.zDistance);
+                zIdx = xIdx;
+            } else {
+                xIdx = MathUtil.findClosestIndex(xTheoreticalDistance, thisMove.xDistance);
+                zIdx = MathUtil.findClosestIndex(zTheoreticalDistance, thisMove.zDistance);
+            }
+        }
+        final int motionIdx = !isPredictable ? xIdx : indexPair;
+        int momentumStorageIdx = motionIdx;
+        if (thisMove.edgeBackoffApplied) {
+            if (found && indexPair >= 0 && indexPair < 9) {
+                momentumStorageIdx = indexPair;
+            } else if (thisMove.hiddenDistanceIndex >= 0) {
+                momentumStorageIdx = thisMove.hiddenDistanceIndex;
+            } else {
+                final int edgeMomIdx = HiddenMotionReconstructor.findBestEdgeMomentumIndex(
+                        xMotionBeforeEdge, zMotionBeforeEdge, xBackOffAfterEdge, zBackOffAfterEdge, motionIdx);
+                if (edgeMomIdx >= 0) {
+                    momentumStorageIdx = edgeMomIdx;
+                }
+            }
+            // Use cached back-off arrays from the brute loop above instead of recomputing.
+            final boolean selectedClipped = momentumStorageIdx >= 0 && momentumStorageIdx < 9
+                    && HiddenMotionReconstructor.edgeStillClampsCached(xMotionBeforeEdge[momentumStorageIdx],
+                            zMotionBeforeEdge[momentumStorageIdx], xBackOffAfterEdge[momentumStorageIdx], zBackOffAfterEdge[momentumStorageIdx]);
+            thisMove.edgeAxisClamped = selectedClipped;
+            thisMove.edgeCornerClamp = selectedClipped && momentumStorageIdx >= 0 && momentumStorageIdx < 9
+                    && HiddenMotionReconstructor.edgeStillClampsCornerCached(xMotionBeforeEdge[momentumStorageIdx],
+                            zMotionBeforeEdge[momentumStorageIdx], xBackOffAfterEdge[momentumStorageIdx], zBackOffAfterEdge[momentumStorageIdx]);
+        }
+        if (thisMove.edgeBackoffApplied && thisMove.edgeAxisClamped) {
+            thisMove.motionX = xMotionBeforeEdge[momentumStorageIdx];
+            thisMove.motionZ = zMotionBeforeEdge[momentumStorageIdx];
+        } else if (!thisMove.edgeBackoffApplied) {
+            thisMove.motionX = xMotionBeforeEdge[motionIdx];
+            thisMove.motionZ = zMotionBeforeEdge[motionIdx];
+        } else {
+            thisMove.motionX = thisMove.xDistance;
+            thisMove.motionZ = thisMove.zDistance;
         }
         // Done, set in this move.
-        thisMove.xAllowedDistance = xTheoreticalDistance[!isPredictable ? xIdx : indexPair];
-        thisMove.zAllowedDistance = zTheoreticalDistance[!isPredictable ? zIdx : indexPair];
+        thisMove.xAllowedDistance = xTheoreticalDistance[motionIdx];
+        thisMove.zAllowedDistance = zTheoreticalDistance[motionIdx];
         thisMove.hasImpulse = !isPredictable ? AlmostBoolean.MAYBE // We don't know the direction in this case.
                               : AlmostBoolean.match(theorInputs[indexPair].getForwardDir() != ForwardDirection.NONE || theorInputs[indexPair].getStrafeDir() != StrafeDirection.NONE);
-        thisMove.strafeImpulse = theorInputs[isPredictable ? indexPair : xIdx].getStrafeDir();
-        thisMove.forwardImpulse = theorInputs[isPredictable ? indexPair : zIdx].getForwardDir();
+        thisMove.strafeImpulse = theorInputs[motionIdx].getStrafeDir();
+        thisMove.forwardImpulse = theorInputs[motionIdx].getForwardDir();
         if (debug) {
-            player.sendMessage(ChatColor.YELLOW + "[SurvivalFly] (postPredict) " + (!isPredictable ? "Uncertain" : "Predicted") + " direction: " + theorInputs[isPredictable ? indexPair : xIdx].getForwardDir() +" | "+ theorInputs[isPredictable ? indexPair : xIdx].getStrafeDir());
+            player.sendMessage(ChatColor.YELLOW + "[SurvivalFly] (postPredict) " + (!isPredictable ? "Uncertain" : "Predicted") + " direction: " + theorInputs[motionIdx].getForwardDir() +" | "+ theorInputs[motionIdx].getStrafeDir());
         }
         return isPredictable;
     }
     
     
+    /**
+     * Reconstruct suppressed ticks (including {@code maybeBackOffFromEdge} in the simulator) and fold into prediction.
+     *
+     * @return Matched candidate index, or {@code -1}.
+     */
+    private int tryFoldHiddenTickExplanation(final Player player, final int hiddenSeed, final double[] xTheoreticalDistance, final double[] zTheoreticalDistance,
+            final double[] xMotionBeforeEdge, final double[] zMotionBeforeEdge, final PlayerKeyboardInput[] theorInputs, final float sinYaw,
+            final float cosYaw, final float movementSpeed, final MovingData data, final IPlayerData pData, final PlayerLocation from,
+            final boolean onGround, final double yDistanceBeforeCollide, final boolean strict, final Collection<String> tags) {
+        if (hiddenSeed < 0 || hiddenSeed >= xTheoreticalDistance.length) {
+            return -1;
+        }
+        final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
+        final double seedX = xMotionBeforeEdge[hiddenSeed];
+        final double seedZ = zMotionBeforeEdge[hiddenSeed];
+        final double[] result = HiddenMotionReconstructor.findBestHiddenTickExplanation(sinYaw, cosYaw, movementSpeed, theorInputs[hiddenSeed],
+                seedX, seedZ, data, pData, from, pData.isInCrouchingPose(),
+                attributeAccess.getHandle().getPlayerSneakingFactor(player), BridgeMisc.isSlowedDownByUsingAnItem(player), onGround,
+                xTheoreticalDistance[hiddenSeed], zTheoreticalDistance[hiddenSeed], yDistanceBeforeCollide, player.isFlying());
+        if (thisMove.xDistance == 0 && thisMove.zDistance == 0) {
+            thisMove.xCorrectedDistancePost = xTheoreticalDistance[hiddenSeed];
+            thisMove.zCorrectedDistancePost = zTheoreticalDistance[hiddenSeed];
+            xTheoreticalDistance[hiddenSeed] = 0.0;
+            zTheoreticalDistance[hiddenSeed] = 0.0;
+            tags.add("hdistzero");
+        } else {
+            xTheoreticalDistance[hiddenSeed] += result[0];
+            zTheoreticalDistance[hiddenSeed] += result[1];
+        }
+        final double matchTol = thisMove.edgeBackoffApplied
+                ? HiddenMotionReconstructor.edgeCornerMatchTolerance(Math.max(thisMove.hDistance, MathUtil.dist(seedX, seedZ)))
+                : Magic.PREDICTION_EPSILON;
+        if (strict) {
+            if (MathUtil.almostEqual(thisMove.xDistance, xTheoreticalDistance[hiddenSeed], matchTol)
+                    && MathUtil.almostEqual(thisMove.zDistance, zTheoreticalDistance[hiddenSeed], matchTol)) {
+                thisMove.xCorrectedDistancePre = result[0];
+                thisMove.zCorrectedDistancePre = result[1];
+                return hiddenSeed;
+            }
+        } else {
+            final double theoreticalHDistance = MathUtil.dist(xTheoreticalDistance[hiddenSeed], zTheoreticalDistance[hiddenSeed]);
+            if (MathUtil.almostEqual(theoreticalHDistance, thisMove.hDistance, matchTol)) {
+                return hiddenSeed;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * After a corner candidate is applied, allow only a speed-scaled offset vs the matched allowed distance
+     */
+    private static double applyEdgeCornerResolvedTolerance(final PlayerMoveData thisMove, final double hDistanceAboveLimit, final boolean strict) {
+        if (hDistanceAboveLimit <= 0.0 || !thisMove.edgeCornerResolved) {
+            return hDistanceAboveLimit;
+        }
+        final double tolerance = HiddenMotionReconstructor.edgeCornerMatchTolerance(
+                Math.max(thisMove.hAllowedDistance, thisMove.hDistance));
+        if (strict) {
+            if (Math.abs(thisMove.xDistance - thisMove.xAllowedDistance) <= tolerance
+                    && Math.abs(thisMove.zDistance - thisMove.zAllowedDistance) <= tolerance) {
+                return 0.0;
+            }
+        } else if (Math.abs(thisMove.hDistance - thisMove.hAllowedDistance) <= tolerance) {
+            return 0.0;
+        }
+        return hDistanceAboveLimit;
+    }
+
     /**
      * In case we couldn't predict speed, just ensure that actual speed is below what we estimated.
      * This allows for minor deviations below the allowed speed limit, thus players/cheaters may execute movements 

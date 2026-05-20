@@ -114,6 +114,18 @@ public class Magic {
     public static final double PAPER_DIST = 0.01;
     /** The margin of error tolerated by predictions */
     public static final double PREDICTION_EPSILON = 0.0001;
+    /** Minimum match tolerance for sneak-edge corner recovery (post-collide vs packet). */
+    public static final double EDGE_SNEAK_CORNER_MATCH_TOLERANCE_MIN = 0.02;
+    /** Maximum match tolerance for sneak-edge corner recovery (swift sneak / speed potions). */
+    public static final double EDGE_SNEAK_CORNER_MATCH_TOLERANCE_MAX = 0.14;
+    /** Scales corner match tolerance from the reference horizontal speed of the tick. */
+    public static final double EDGE_SNEAK_CORNER_MATCH_SPEED_RATIO = 0.45;
+    /** Floor for sneak-edge packet-trust bypass (per-tick horizontal distance). */
+    public static final double EDGE_SNEAK_BYPASS_MAX_HDIST = 0.15;
+    /** Ceiling for sneak-edge bypass (swift sneak + speed potion). */
+    public static final double EDGE_SNEAK_BYPASS_MAX_HDIST_HARD = 0.36;
+    /** Scales bypass cap from {@code MovingData.walkSpeed}. */
+    public static final double EDGE_SNEAK_BYPASS_WALK_SPEED_FACTOR = 4.5;
     /**
      * Absolute vertical distance that players can cover with a single move
      */
