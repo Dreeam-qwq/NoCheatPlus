@@ -1570,7 +1570,8 @@ public class RichBoundsLocation implements IGetBukkitLocation, IGetBlockPosition
         pitch = location.getPitch();
 
         // Set bounding box.
-        final double dxz = fullWidth / 2D; // Don't round thing up, otherwise from#collide will fail randomly
+        // final double dxz = Math.round(fullWidth * 500.0) / 1000.0; // this.width / 2; // 0.3;
+        final double dxz = Math.round(fullWidth * 500.0) / 1000.0; // fullWidth / 2f; <---- This -for some reasons- yields thisMove.headObstructed = true when moving against walls!
         minX = x - dxz;
         minY = y;
         minZ = z - dxz;

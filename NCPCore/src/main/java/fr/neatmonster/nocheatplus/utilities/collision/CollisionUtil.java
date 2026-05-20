@@ -1011,13 +1011,12 @@ public class CollisionUtil {
                     if (BlockProperties.isAir(mat) || BlockProperties.isPassable(mat)) {
                         continue;
                     }
-                    // NOTE: Remove for now there seem to cause random false positive when collide with walls
                     // how many of the current block’s coordinates (x, y, z) lie on the edges of the search region defined by the entity’s AABB
-                    //int edgeCount = ((x == minBlockX || x == maxBlockX) ? 1 : 0) +
-                    //                ((y == minBlockY || y == maxBlockY) ? 1 : 0) +
-                    //                ((z == minBlockZ || z == maxBlockZ) ? 1 : 0);
-                    //if (edgeCount != 3 && (edgeCount != 1 || (BlockFlags.getBlockFlags(mat) & BlockFlags.F_HEIGHT150) != 0) 
-                    //    && (edgeCount != 2 || mat == BridgeMaterial.MOVING_PISTON)) {
+                    int edgeCount = ((x == minBlockX || x == maxBlockX) ? 1 : 0) +
+                                    ((y == minBlockY || y == maxBlockY) ? 1 : 0) +
+                                    ((z == minBlockZ || z == maxBlockZ) ? 1 : 0);
+                    if (edgeCount != 3 && (edgeCount != 1 || (BlockFlags.getBlockFlags(mat) & BlockFlags.F_HEIGHT150) != 0) 
+                        && (edgeCount != 2 || mat == BridgeMaterial.MOVING_PISTON)) {
                         // Don't add to a list if we only care if the player intersects with the block
                         if (!onlyCheckCollide) {
                             // NOTE: Should use getBounds that being cached, not the fetchBounds will re-fetch the data
@@ -1030,7 +1029,7 @@ public class CollisionUtil {
                         else if (AxisAlignedBBUtils.isCollided(blockCache.getBounds(x, y, z), x, y, z, entityAABB, true)) {
                             return true;
                         }
-                    //}
+                    }
                 }
             }
         }

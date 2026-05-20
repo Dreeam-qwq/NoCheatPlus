@@ -55,11 +55,6 @@ public class KeepAliveFrequency extends Check {
             }
             final double vl = Math.max(first - getFirstBucketViolationLimit(data), fullScore - data.keepAliveFreq.numberOfBuckets());
             final boolean cancel = executeActions(player, vl, 1.0, cc.keepAliveFrequencyActions).willCancel();
-            if (CheckUtils.shouldLogDebugToConsole()) {
-                // Diagnostic info: bucket details separate duplicate packets from normal boundary timing.
-                logConsoleDetails(player, time, now, joinTime, data, cc, pData, first, fullScore, vl,
-                        cancel, describeKeepAliveModel(data, fullScore, first), getFirstBucketViolationLimit(data));
-            }
             return cancel;
         }
         return false;
@@ -102,29 +97,5 @@ public class KeepAliveFrequency extends Check {
 
     private float getFallbackFirstBucketLimit(final NetData data) {
         return Math.max(3f, Math.min(6f, data.keepAliveFreq.numberOfBuckets() / 4f));
-    }
-
-    private String describeKeepAliveModel(final NetData data, final float fullScore, final float first) {
-        if (data.keepAliveDuplicateId) {
-            return "duplicate-id";
-        }
-        if (data.keepAliveOutgoingSeen) {
-            return "unmatched-outgoing";
-        }
-        if (isUntrackedMonotonicBurst(data, fullScore, first)) {
-            return "untracked-monotonic-burst";
-        }
-        return "bucket-frequency";
-    }
-
-    private void logConsoleDetails(final Player player, final long packetTime, final long now, final long joinTime,
-                                   final NetData data, final NetConfig cc, final IPlayerData pData,
-                                   final float first, final float fullScore, final double vl,
-                                   final boolean cancel, final String model, final float firstLimit) {
-        try {
-            player.getServer().getLogger().info(KeepAliveDiagnostics.formatDetail(player, packetTime, now, joinTime,
-                    data, cc, pData, first, fullScore, vl, cancel, model, firstLimit));
-        }
-        catch (Throwable ignored) {}
     }
 }
