@@ -928,10 +928,8 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
 //                //to.setPitch(currentPitch);
 //            }
             
-            // Normal move: fire from -> to
+            // Normal move: fire from -> to (client onGround from Player#isOnGround at to)
             if (BridgeMisc.isWASDImpulseKnown(player)) data.input.set(player.getCurrentInput());
-            // Optimization: best-effort associate this normal Bukkit move with the latest queued flying packet,
-            // but only scan the "new since last match" prefix (no fallback scan).
             {
                 final NetData netData = pData.getGenericInstance(NetData.class);
                 final long lastMatchedToSeq = netData.getLastMatchedMoveToSequence();
@@ -947,40 +945,38 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                         if (packetData.getSequence() <= lastMatchedToSeq) {
                             break;
                         }
-                        scanLimit = idx + 1; // exclusive
+                        scanLimit = idx + 1;
                     }
                 }
-                int toIndex = -1;
+                //int toIndex = -1;
                 for (int idx = 0; idx < scanLimit; idx++) {
                     final DataPacketFlying packetData = flyingQueue[idx];
-                    if (packetData == null) {
-                        continue;
-                    }
-                    if (packetData.hasPos
-                        && TrigUtil.isSamePos(to.getX(), to.getY(), to.getZ(),
-                                              packetData.getX(), packetData.getY(), packetData.getZ())) {
-                        toIndex = idx;
+                    if (packetData != null && packetData.hasPos
+                            && TrigUtil.isSamePos(to.getX(), to.getY(), to.getZ(),
+                                    packetData.getX(), packetData.getY(), packetData.getZ())) {
+                        netData.updateLastMatchedMoveToSequence(packetData.getSequence());
                         break;
                     }
-                }
-                if (toIndex >= 0 && flyingQueue[toIndex] != null) {
-                    netData.updateLastMatchedMoveToSequence(flyingQueue[toIndex].getSequence());
-                    // Best-effort find the matching "from" anchor (older than "to") to store a per-event range.
-                    int fromIndex = -1;
-                    for (int idx = toIndex + 1; idx < flyingQueue.length; idx++) {
-                        final DataPacketFlying packetData = flyingQueue[idx];
-                        if (packetData == null || !packetData.hasPos) {
-                            continue;
-                        }
-                        //if (TrigUtil.isSamePos(from.getX(), from.getY(), from.getZ(),
-                        //                      packetData.getX(), packetData.getY(), packetData.getZ())) {
-                        fromIndex = idx;
-                        break;
-                        //}
-                    }
+                    //if (toIndex >= 0 && flyingQueue[toIndex] != null) {
+                    //    netData.updateLastMatchedMoveToSequence(flyingQueue[toIndex].getSequence());
+                        // Best-effort find the matching "from" anchor (older than "to") to store a per-event range.
+                    //    int fromIndex = -1;
+                    //    for (int idx = toIndex + 1; idx < flyingQueue.length; idx++) {
+                    //        final DataPacketFlying packetData = flyingQueue[idx];
+                    //        if (packetData == null || !packetData.hasPos) {
+                    //            continue;
+                    //        }
+                            //if (TrigUtil.isSamePos(from.getX(), from.getY(), from.getZ(),
+                            //                      packetData.getX(), packetData.getY(), packetData.getZ())) {
+                    //        fromIndex = idx;
+                    //        break;
+                            //}
+                    //    }
+                    //}
                     //TODO: We now have some extra look,ground if fromIndex - toIndex > 1. Now how to feed in 0.03 reconstructor if there is, from here? 
                 }
             }
+            data.setPendingBukkitGround(player, data.playerMoves.getFirstPastMove());
             moveInfo.set(player, from, to, cc.yOnGround);
             checkPlayerMove(player, from, to, 0, moveInfo, debug, data, cc, pData, event, true);
         }
@@ -1091,6 +1087,8 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                 float currentYaw = from.getYaw();
                 float currentPitch = from.getPitch();
                 Location packet = null;
+                DataPacketFlying segmentFromPacket = null;
+                final boolean trustPacketHorizontalCollision = false;
                 // NOTE: Inverted from last versions to match logic
                 for (int i = j - 1; i >= 0; i--) {
                     if (filteredFlyingQueue[i].hasLook) {
@@ -1106,6 +1104,9 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                             currentToIndex = count >= maxSplit ? -1 : i;
                             /* The 'to' location skipped/lost by Bukkit in the flying queue. Use Bukkit's "to" if the maximum split was reached */
                             Location packetTo = count >= maxSplit ? to : new Location(from.getWorld(), filteredFlyingQueue[i].getX(), filteredFlyingQueue[i].getY(), filteredFlyingQueue[i].getZ(), currentYaw, currentPitch);
+                            final DataPacketFlying segmentToPacket = count >= maxSplit && toIndex >= 0
+                                    ? flyingQueue[toIndex] : filteredFlyingQueue[i];
+                            data.setPendingClientPacketGround(segmentFromPacket, segmentToPacket, trustPacketHorizontalCollision);
                             // Finally, set the moving data to be used by checks.
                             moveInfo.set(player, packet, packetTo, cc.yOnGround);
                             // Finally, remap the input for this move.
@@ -1135,6 +1136,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                         }
                         /* The 'from' location skipped/lost by Bukkit in the flying queue */
                         currentFromIndex = i;
+                        segmentFromPacket = filteredFlyingQueue[i];
                         packet = new Location(from.getWorld(), filteredFlyingQueue[i].getX(), filteredFlyingQueue[i].getY(), filteredFlyingQueue[i].getZ(), currentYaw, currentPitch);
                     }
                 }
@@ -1161,6 +1163,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
     private void bukkitSplitMove(final Player player, final PlayerMoveInfo moveInfo, final Location from, final Location loc, final Location to, 
                                  final boolean debug, final MovingData data, final MovingConfig cc, final IPlayerData pData, final PlayerMoveEvent event) {
         // 1: Use player#getLocation() as the "to" location (from->loc).
+        data.setPendingBukkitGround(player, data.playerMoves.getFirstPastMove());
         moveInfo.set(player, from, loc, cc.yOnGround);
         if (debug) {
             debug(player, "Split move (bukkit): 1 (from -> loc)");
@@ -1171,6 +1174,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
             onMoveMonitorNotCancelled(player, from, loc, System.currentTimeMillis(), TickTask.getTick(), pData.getGenericInstance(CombinedData.class), data, cc, pData);
             data.joinOrRespawn = false;
             // 2: Use player#getLocation() as the "from" location (loc -> to).
+            data.setPendingBukkitGround(player, data.playerMoves.getFirstPastMove());
             moveInfo.set(player, loc, to, cc.yOnGround);
             checkPlayerMove(player, loc, to, 2, moveInfo, debug, data, cc, pData, event, false);
             if (debug) {
@@ -1293,6 +1297,7 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         thisMove.setBackYDistance = pTo.getY() - data.getSetBackY();
         thisMove.isGliding = Bridge1_9.isGliding(player);
         thisMove.tridentRelease = data.consumeTridentReleaseEvent();
+        data.applyPendingClientPacketGround(thisMove);
 
         ////////////////////////////
         // Potion effect "Jump".  //

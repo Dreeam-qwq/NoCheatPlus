@@ -35,7 +35,9 @@ import fr.neatmonster.nocheatplus.checks.moving.model.LiftOffEnvelope;
 import fr.neatmonster.nocheatplus.checks.moving.model.MoveConsistency;
 import fr.neatmonster.nocheatplus.checks.moving.model.MoveTrace;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerKeyboardInput;
+import fr.neatmonster.nocheatplus.checks.moving.envelope.PhysicsGroundResolver;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
+import fr.neatmonster.nocheatplus.checks.net.model.DataPacketFlying;
 import fr.neatmonster.nocheatplus.checks.moving.model.VehicleMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.PairAxisVelocity;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.PairEntry;
@@ -181,6 +183,14 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
      * This data is stored in MovingData instead of the Moving trace, as the latter may be invalidated, overridden or otherwise wiped out, while the input state is still valid and needed for the next move(s); it is not suitable for long-term storage.
      */
     public PlayerKeyboardInput input = new PlayerKeyboardInput();
+
+    /** Pending client onGround for the next {@link fr.neatmonster.nocheatplus.checks.moving.MovingListener#checkPlayerMove}. */
+    public boolean pendingHasClientFromOnGround;
+    public boolean pendingClientFromOnGround;
+    public boolean pendingHasClientToOnGround;
+    public boolean pendingClientToOnGround;
+    public boolean pendingHasClientToHorizontalCollision;
+    public boolean pendingClientToHorizontalCollision;
 
     // *----------Velocity handling----------* 
     /** Tolerance value for using vertical velocity (the client sends different values than received with fight damage). */
@@ -439,6 +449,59 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         thisMove.hasImpulse = AlmostBoolean.NO;
         thisMove.strafeImpulse = PlayerKeyboardInput.StrafeDirection.NONE;
         thisMove.forwardImpulse = PlayerKeyboardInput.ForwardDirection.NONE;
+    }
+
+    /**
+     * Packet-split segment: onGround from matched flying packets.
+     *
+     * @param trustHorizontalCollision {@code true} when the server protocol exposes horizontal collision (1.21.3+).
+     */
+    public void setPendingClientPacketGround(final DataPacketFlying fromPacket,
+            final DataPacketFlying toPacket,
+            final boolean trustHorizontalCollision) {
+        pendingHasClientFromOnGround = fromPacket != null;
+        pendingClientFromOnGround = fromPacket != null && fromPacket.onGround;
+        pendingHasClientToOnGround = toPacket != null;
+        pendingClientToOnGround = toPacket != null && toPacket.onGround;
+        pendingHasClientToHorizontalCollision = trustHorizontalCollision && toPacket != null;
+        pendingClientToHorizontalCollision = toPacket != null && toPacket.horizontalCollision;
+    }
+
+    /**
+     * Normal / Bukkit-split move: {@link org.bukkit.entity.Player#isOnGround()} at the segment end (to).
+     * Segment start (from) uses the previous segment's to ground when available.
+     */
+    public void setPendingBukkitGround(final org.bukkit.entity.Player player, final PlayerMoveData lastMove) {
+        pendingHasClientToOnGround = true;
+        pendingClientToOnGround = player.isOnGround();
+        if (lastMove.toIsValid && lastMove.hasClientToOnGround) {
+            pendingHasClientFromOnGround = true;
+            pendingClientFromOnGround = lastMove.clientToOnGround;
+        }
+        else {
+            pendingHasClientFromOnGround = true;
+            pendingClientFromOnGround = pendingClientToOnGround;
+        }
+        pendingHasClientToHorizontalCollision = false;
+    }
+
+    public void clearPendingClientPacketGround() {
+        pendingHasClientFromOnGround = false;
+        pendingHasClientToOnGround = false;
+        pendingHasClientToHorizontalCollision = false;
+    }
+
+    public void applyPendingClientPacketGround(final PlayerMoveData move) {
+        if (!pendingHasClientFromOnGround && !pendingHasClientToOnGround) {
+            PhysicsGroundResolver.clearClientPacketGround(move);
+            clearPendingClientPacketGround();
+            return;
+        }
+        PhysicsGroundResolver.bindClientGround(move,
+                pendingClientFromOnGround, pendingHasClientFromOnGround,
+                pendingClientToOnGround, pendingHasClientToOnGround,
+                pendingClientToHorizontalCollision, pendingHasClientToHorizontalCollision);
+        clearPendingClientPacketGround();
     }
 
 

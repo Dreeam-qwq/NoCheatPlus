@@ -188,12 +188,12 @@ public class HiddenMotionReconstructor {
         
         final PlayerMoveData lastMove = data.playerMoves.getFirstPastMove();
         double baseY = yDistance;
-        if (pData.isShiftKeyPressed() && lastMove.collideY) { 
+        if (!pData.isShiftKeyPressed()) { 
             if (baseY < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
-                if (lastMove.to.onBouncyBlock) {
+                if (from.isOnBouncyBlock()) {
                     // The effect works by inverting the distance.
                     // Beds have a weaker bounce effect (BedBlock.java).
-                    baseY = lastMove.to.onSlimeBlock ? -baseY : -baseY * 0.66;
+                    baseY = from.isOnSlimeBlock() ? -baseY : -baseY * 0.66;
                 }
             }
         }
@@ -532,19 +532,11 @@ public class HiddenMotionReconstructor {
                 baseZ = 0.0;
             }
         }
-
-        if (from.isOnSlimeBlock() && onGround) {
-            if (Math.abs(lastMove.yDistance) < 0.1 && !pData.isShiftKeyPressed()) {
-                if (thisMove.yDistance == 0.0) {
-                    baseX *= 0.67;
-                    baseZ *= 0.67;
-                }
-                else {
-                    final double mul = 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                    baseX *= mul;
-                    baseZ *= mul;
-                }
-            }
+        // TODO: More complicated than this!!!. Hidden onground need to feed here
+        if (from.isOnSlimeBlock() && thisMove.hasClientFromOnGround && thisMove.clientFromOnGround && Math.abs(lastMove.motionY) < 0.1 && !pData.isShiftKeyPressed()) {
+            final double slimeMul = 0.4 + Math.abs(lastMove.motionY) * 0.2;
+            baseX *= slimeMul;
+            baseZ *= slimeMul;
         }
 
         if (from.isSlidingDown()) {
@@ -718,18 +710,10 @@ public class HiddenMotionReconstructor {
             baseX += liquidFlowVector.getX();
             baseZ += liquidFlowVector.getZ();
             // Shortcut: only do when non zero
-            if (from.isOnSlimeBlock() && onGround) {
-                if (Math.abs(lastMove.yDistance) < 0.1 && !pData.isShiftKeyPressed()) {
-                    if (thisMove.yDistance == 0.0) {
-                        baseX *= 0.67;
-                        baseZ *= 0.67;
-                    } 
-                    else {
-                        final double mul = 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                        baseX *= mul;
-                        baseZ *= mul;
-                    }
-                }
+            if (from.isOnSlimeBlock() && thisMove.hasClientFromOnGround && thisMove.clientFromOnGround && Math.abs(lastMove.motionY) < 0.1 && !pData.isShiftKeyPressed()) {
+                final double slimeMul = 0.4 + Math.abs(lastMove.motionY) * 0.2;
+                baseX *= slimeMul;
+                baseZ *= slimeMul;
             }
             if (from.isSlidingDown()) { 
                 if (lastMove.yDistance < -Magic.SLIDE_START_AT_VERTICAL_MOTION_THRESHOLD) {
@@ -789,7 +773,7 @@ public class HiddenMotionReconstructor {
         baseX = stopHoriz[0];
         baseZ = stopHoriz[1];
         Vector collisionVector = from.collide(new Vector(baseX, yDistanceBeforeCollide, baseZ), onGround, from.getBoundingBox());
-        return new double[] {collisionVector.getX(), collisionVector.getZ()}; 
+        return new double[] {collisionVector.getX(), collisionVector.getZ()};
     }
     
     

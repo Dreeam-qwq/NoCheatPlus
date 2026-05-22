@@ -35,6 +35,7 @@ import fr.neatmonster.nocheatplus.checks.combined.Improbable;
 import fr.neatmonster.nocheatplus.checks.moving.MovingConfig;
 import fr.neatmonster.nocheatplus.checks.moving.MovingData;
 import fr.neatmonster.nocheatplus.checks.moving.envelope.PhysicsEnvelope;
+import fr.neatmonster.nocheatplus.checks.moving.envelope.PhysicsGroundResolver;
 import fr.neatmonster.nocheatplus.checks.moving.envelope.workaround.LostGround;
 import fr.neatmonster.nocheatplus.checks.moving.envelope.workaround.MagicWorkarounds;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerKeyboardInput;
@@ -212,7 +213,6 @@ public class SurvivalFly extends Check {
             yAllowedDistance = res[0];
             yDistanceAboveLimit = res[1];
         }
-
 
         ////////////////////////////
         // Debug output.          //
@@ -697,9 +697,7 @@ public class SurvivalFly extends Check {
             return new double[]{thisMove.hAllowedDistance, hDistanceAboveLimit};
         }
         
-        boolean onGround = from.isOnGround() || lastMove.toIsValid && lastMove.yDistance <= 0.0 && lastMove.from.onGround || lastMove.yDistance < 0.0 && thisMove.fromLostGround || forceSetOnGround;
-        // Override ground status if needed.
-        if (forceSetOffGround) onGround = false;
+        boolean onGround = PhysicsGroundResolver.resolvePhysicsOnGround(from, thisMove, lastMove, forceSetOnGround, forceSetOffGround);
         /* All moves are assumed to be predictable, unless there are technical limitations / bugs / glitches that we cannot solve */
         boolean isPredictable;
         //////////////////////////////////////////////////////////////
@@ -841,6 +839,8 @@ public class SurvivalFly extends Check {
         final CombinedData cData = pData.getGenericInstance(CombinedData.class);
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
         final PlayerMoveData lastMove = data.playerMoves.getFirstPastMove();
+        final boolean envelopeFromOnGround = PhysicsGroundResolver.resolveEnvelopeFromOnGround(thisMove, fromOnGround);
+        final boolean envelopeToOnGround = PhysicsGroundResolver.resolveEnvelopeToOnGround(thisMove, toOnGround);
         
         // Reference commit of this piece of code: https://github.com/NoCheatPlus/NoCheatPlus/commit/1c024c072c9f6ebe5371c113916c6a2414e635a6
         /////////////////////////////////////////////////////
@@ -951,9 +951,17 @@ public class SurvivalFly extends Check {
          * Normally, these would be computed at the same time, however, since NCP handles horizontal and vertical speed estimation separately, we need to duplicate this bit of code here.
          * TODO: Unify predictions somehow.
          */
-        double yDistanceBeforeCollide = lastMove.toIsValid ? lastMove.yDistance : 0.0;
-        if (lastMove.yCorrectedDistancePre != 0.0) {
-            yDistanceBeforeCollide = lastMove.yCorrectedDistancePre;
+        final boolean slimeYbcChain = from.isOnBouncyBlock();
+        double yDistanceBeforeCollide;
+        if (slimeYbcChain) {
+            yDistanceBeforeCollide = lastMove.motionY;
+        }
+        else {
+            yDistanceBeforeCollide = lastMove.toIsValid ? lastMove.yDistance : 0.0;
+            if (lastMove.yCorrectedDistancePre != 0.0) {
+                yDistanceBeforeCollide = lastMove.yCorrectedDistancePre;
+            }
+            if (envelopeToOnGround) yDistanceBeforeCollide = 0.0;
         }
         // Refine yDistanceBeforeCollide (seed set above for edge-sneak momentum carry).
         if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) {
@@ -961,12 +969,12 @@ public class SurvivalFly extends Check {
                 yDistanceBeforeCollide = 0.0;
             }
         }
-        if (pData.isShiftKeyPressed() && lastMove.collideY) {
-            if (yDistanceBeforeCollide < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
-                if (lastMove.to.onBouncyBlock) {
+        if (!pData.isShiftKeyPressed()) {
+            if (yDistanceBeforeCollide < 0.0 && thisMove.yDistance >= 0.0) {
+                if (from.isOnBouncyBlock()) {
                     // The effect works by inverting the distance.
                     // Beds have a weaker bounce effect (BedBlock.java).
-                    yDistanceBeforeCollide = lastMove.to.onSlimeBlock ? -yDistanceBeforeCollide : -yDistanceBeforeCollide * 0.66;
+                    yDistanceBeforeCollide = from.isOnSlimeBlock() ? -yDistanceBeforeCollide : -yDistanceBeforeCollide * 0.66;
                 }
             }
         }
@@ -977,7 +985,7 @@ public class SurvivalFly extends Check {
                 // On 1.13 and above, only friction gets applied, resulting in a much slower descending speed when not pressing the space bar pressed.
                 if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) {
                     yDistanceBeforeCollide -= Magic.LEGACY_LIQUID_GRAVITY;
-                } 
+                }
                 else {
                     // In 1.13 the gravity effect in liquids was removed and this function got added.
                     Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, yDistanceBeforeCollide <= 0.0, new Vector(0.0, yDistanceBeforeCollide, 0.0), cData.wasSprinting);
@@ -991,7 +999,7 @@ public class SurvivalFly extends Check {
                 if (BridgeMisc.hasGravity(player)) {
                     if (pData.getClientVersion().isLowerThan(ClientVersion.V_1_13)) {
                         yDistanceBeforeCollide -= Magic.LEGACY_LIQUID_GRAVITY;
-                    } 
+                    }
                     else {
                         // In 1.13 the gravity effect in liquids was removed and this function got added.
                         Vector fluidFallingAdjustMovement = from.getFluidFallingAdjustedMovement(data.lastGravity, yDistanceBeforeCollide <= 0.0, new Vector(0.0, yDistanceBeforeCollide, 0.0), cData.wasSprinting);
@@ -1011,7 +1019,9 @@ public class SurvivalFly extends Check {
             if (cData.wasLevitating) {
                 yDistanceBeforeCollide += (0.05 * data.lastLevitationLevel - yDistanceBeforeCollide) * 0.2;
             }
-            else yDistanceBeforeCollide -= data.lastGravity;
+            else {
+                yDistanceBeforeCollide -= data.lastGravity;
+            }
             yDistanceBeforeCollide *= data.lastFrictionVertical;
         }
         if (from.isInLiquid() && verticalLiquidPushComponent != 0.0) {
@@ -1035,6 +1045,7 @@ public class SurvivalFly extends Check {
                 yDistanceBeforeCollide = 0.0;
             }
         }
+        thisMove.motionY = yDistanceBeforeCollide;
         //End of yDistanceBeforeCollide getter
 
         //////////////////////////////////////
@@ -1102,46 +1113,12 @@ public class SurvivalFly extends Check {
             thisMove.xAllowedDistance += liquidFlowVector.getX();
             thisMove.zAllowedDistance += liquidFlowVector.getZ();
         }
-        // Slime speed
-        if (from.isOnSlimeBlock() && onGround) {
-            /*
-             * Specific issue with slime speed: the client tries to fall down with -0.0784 gravity, and then bounce back up to 0 >=. Ground status is set to false then.
-             * However, if the bounce-back is smaller than 0.0784, we don't see it on the server-side; we always see the player as being on ground with 0 dist; the multiplier can range from 0.4 to 0.45, depending on the y motion.
-             * In other words, this movement is effectively hidden and cannot be predicted, likewise isVerticallyConstricted()...
-             * Our solution: always assume the multiplier to be at maximum and allow speed lower than that (in other words, just set a limit). 
-             * 
-             * Assume it to be a bug. Mojang is never going to fix this stuff anyway.
-             */
-            if (Math.abs(lastMove.yDistance) < 0.1 && !pData.isShiftKeyPressed()) {
-                if (thisMove.yDistance == 0.0) {
-                    // Mojang... Why did you have to make the multiplier dependent on vertical motion, why...
-                    isPredictable = false;
-                    thisMove.xAllowedDistance *= 0.67; // From testing: 0.6 was too little, while 0.7 a bit too much
-                    thisMove.zAllowedDistance *= 0.67;
-                }
-                else {
-                    // Otherwise, do attempt to predict. Hopefully this works.
-                    thisMove.xAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                    thisMove.zAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                }
-                /*
-                 * 
-                 * For reference: this does not *always* work. Need to test it further.
-                 * Bukkit's getVelocity() does actually report the hidden velocity, but it seems to be behind a tick or something.
-                 * (In fact, getVelocity() seems to moreso represent the player's momentum than their current speed)
-                 * 
-                 * if (thisMove.yDistance == 0.0) {
-                 *     Vector bukkitMomentum = player.getVelocity().clone();
-                 *     thisMove.xAllowedDistance *= 0.4 + Math.abs(bukkitMomentum.getY()) * 0.2;
-                 *     thisMove.zAllowedDistance *= 0.4 + Math.abs(bukkitMomentum.getY()) * 0.2;
-                 * }
-                 * else {
-                 *    thisMove.xAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                 *    thisMove.zAllowedDistance *= 0.4 + Math.abs(lastMove.yDistance) * 0.2;
-                 * }
-                 * 
-                 */
-            }
+        // Slime stepOn: throttle momentum carried from last tick (client stepOn at end of last tick).
+        if (from.isOnSlimeBlock() && thisMove.hasClientFromOnGround && thisMove.clientFromOnGround && Math.abs(lastMove.motionY) < 0.1 && !pData.isShiftKeyPressed()) {
+            double slimeStepMul = 0.4 + Math.abs(lastMove.motionY) * 0.2;
+            thisMove.xAllowedDistance *= slimeStepMul;
+            thisMove.zAllowedDistance *= slimeStepMul;
+            tags.add("slime_step");
         }
         // Sliding speed (honey block)
         if (from.isSlidingDown()) { // TODO: lastMove.from.slideDown or something?
@@ -1199,7 +1176,7 @@ public class SurvivalFly extends Check {
         checkNegligibleMomentum(pData, thisMove);
         // Sprint-jumping...
         // IMPORTANT NOTE: when working **exclusively** with rotations (like in the following cases), you must use the TO location, not the FROM one, as TO contains the most recent rotation. Using FROM lags behind a few ticks, causing false positives when switching looking direction.
-        if (PhysicsEnvelope.isBunnyhop(from, to, pData, fromOnGround, toOnGround, player, forceSetOffGround)) {
+        if (PhysicsEnvelope.isBunnyhop(from, to, pData, envelopeFromOnGround, envelopeToOnGround, player, forceSetOffGround)) {
             thisMove.xAllowedDistance += (double) (-TrigUtil.sin(to.getYaw() * TrigUtil.toRadians) * Magic.BUNNYHOP_BOOST);
             thisMove.zAllowedDistance += (double) (TrigUtil.cos(to.getYaw() * TrigUtil.toRadians) * Magic.BUNNYHOP_BOOST);
             thisMove.bunnyHop = true;
@@ -1597,6 +1574,10 @@ public class SurvivalFly extends Check {
                     thisMove.negligibleHorizontalCollision = thisMove.collidesHorizontally && CollisionUtil.isHorizontalCollisionNegligible(new Vector(xTheoreticalDistance[i], thisMove.yDistance, zTheoreticalDistance[i]), to, theorInputs[i].getStrafe(), theorInputs[i].getForward());
                 }
             }
+            // Note: Always set no matter what, prevent desync
+            if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_20)) {
+                pData.setSupportingBlockData(SupportingBlockUtils.checkSupportingBlock(to.getBlockCache(), player, pData.getSupportingBlockData(), new Vector(thisMove.xDistance, thisMove.yDistance, thisMove.zDistance), to.getBoundingBox(), from.isOnGround()));
+            }
         }
         //////////////////////////////////////////////////////////////
         // Finish. Check if the move had been predictable at all    //
@@ -1868,7 +1849,7 @@ public class SurvivalFly extends Check {
         /* Not on ground, not on climbable, not in liquids, not in stuck-speed, no lostground (...) */
         final boolean fullyInAir = !thisMove.touchedGroundWorkaround && !resetFrom && !resetTo;
         final CombinedData cData = pData.getGenericInstance(CombinedData.class);
-        final boolean onGround = from.isOnGround() || lastMove.toIsValid && lastMove.yDistance <= 0.0 && lastMove.from.onGround;
+        final boolean onGround = PhysicsGroundResolver.resolvePhysicsOnGround(from, thisMove, lastMove, false, false);
         /*
          * 1: Simulate the reset of speed that the client should have sent to the server.
          * [Client lands on the ground but does not come to a "rest" on top of the block (and thus, reset the vertical speed), instead they'll immediately descend right after, but with speed that is still based on a previous move of 0.0]
@@ -1980,20 +1961,20 @@ public class SurvivalFly extends Check {
             if (yTheoreticalDistance != null) {
                 for (int i = 0; i < yTheoreticalDistance.length; i++) {
                     if (yTheoreticalDistance[i] < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
-                        if (lastMove.to.onBouncyBlock) {
+                        if (from.isOnBouncyBlock()) {
                             // The effect works by inverting the distance.
                             // Beds have a weaker bounce effect (BedBlock.java).
-                            yTheoreticalDistance[i] = lastMove.to.onSlimeBlock ? -yTheoreticalDistance[i] : -yTheoreticalDistance[i] * 0.66;
+                            yTheoreticalDistance[i] = from.isOnSlimeBlock() ? -yTheoreticalDistance[i] : -yTheoreticalDistance[i] * 0.66;
                         }
                     }
                 }
                 tags.add("bounceup");
             } else {
                 if (thisMove.yAllowedDistance < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
-                    if (lastMove.to.onBouncyBlock) {
+                    if (from.isOnBouncyBlock()) {
                         // The effect works by inverting the distance.
                         // Beds have a weaker bounce effect (BedBlock.java).
-                        thisMove.yAllowedDistance = lastMove.to.onSlimeBlock ? -thisMove.yAllowedDistance : -thisMove.yAllowedDistance * 0.66;
+                        thisMove.yAllowedDistance = from.isOnSlimeBlock() ? -thisMove.yAllowedDistance : -thisMove.yAllowedDistance * 0.66;
                     }
                 }
                 tags.add("bounceup");

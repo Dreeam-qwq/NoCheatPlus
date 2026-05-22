@@ -114,6 +114,7 @@ public class PlayerMoveData extends MoveData {
     public boolean edgeCornerResolved;
 
     public double motionX;
+    /** Slime: last tick modeled {@code yBC}; chains as seed when packet {@code yDistance == 0} until leaving slime. */
     public double motionY;
     public double motionZ;
 
@@ -253,7 +254,19 @@ public class PlayerMoveData extends MoveData {
     
     /** Highly uncertain movement: player might step up with this movement; we cannot know for sure. Set with lost-ground couldstep */
     public boolean couldStepUp;
-    
+
+    /**
+     * Client onGround for this segment (flying packet on packet-split, or {@link org.bukkit.entity.Player#isOnGround()} otherwise).
+     */
+    public boolean hasClientFromOnGround;
+    public boolean clientFromOnGround;
+    public boolean hasClientToOnGround;
+    public boolean clientToOnGround;
+    /**
+     * To-packet horizontal collision (1.21.3+ protocol). Only consumed on the non-brute (WASD-known) path.
+     */
+    public boolean hasClientToHorizontalCollision;
+    public boolean clientToHorizontalCollision;
 
     // Meta stuff.
     /**
@@ -352,6 +365,9 @@ public class PlayerMoveData extends MoveData {
         isStepUp = false;
         isJump = false;
         couldStepUp = false;
+        hasClientFromOnGround = false;
+        hasClientToOnGround = false;
+        hasClientToHorizontalCollision = false;
         // Bounds set by checks.
         xAllowedDistance = 0.0;
         yAllowedDistance = 0.0;

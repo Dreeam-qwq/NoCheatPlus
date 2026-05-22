@@ -607,7 +607,7 @@ public class RichEntityLocation extends RichBoundsLocation {
         boolean collideX = wantedInput.getX() != allowedMovement.getX();
         boolean collideY = wantedInput.getY() != allowedMovement.getY();
         boolean collideZ = wantedInput.getZ() != allowedMovement.getZ();
-        boolean touchGround = onGround || collideY && allowedMovement.getY() < 0.0; // Already on ground. Or this downward movement would result in the player touching the ground.
+        boolean touchGround = onGround || collideY && wantedInput.getY() < 0.0; // Already on ground. Or this downward movement would result in the player touching the ground.
         /* 
           Players can step blocks up to 0.6 or 0.5, depending on the client version (if older than 1.8). Boats cannot step. All other vehicles can step a whole block up.
            TODO: Make attributes accessible to entities as well.

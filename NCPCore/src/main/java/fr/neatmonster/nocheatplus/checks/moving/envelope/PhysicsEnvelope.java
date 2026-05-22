@@ -109,10 +109,10 @@ public class PhysicsEnvelope {
         Vector collisionVector = from.collide(new Vector(0.0, jumpGain, 0.0), fromOnGround || thisMove.fromLostGround, from.getBoundingBox());
         thisMove.headObstructed = jumpGain != collisionVector.getY() && thisMove.yDistance >= 0.0 && !toOnGround; // For setting the flag, we don't care about the correct speed.
         jumpGain = collisionVector.getY();
-        if (!MathUtil.almostEqual(thisMove.yDistance, jumpGain, Magic.PREDICTION_EPSILON)) { // NOTE: This must be the current move, never the last one.
+        //if (!MathUtil.almostEqual(thisMove.yDistance, jumpGain, Magic.PREDICTION_EPSILON)) { // NOTE: This must be the current move, never the last one.
             // This is not a jumping motion. Abort early.
-            return false;
-        }
+        //    return false;
+        //}
         //////////////////////////////////
         // 2: Ground conditions.
         //////////////////////////////////
@@ -161,7 +161,7 @@ public class PhysicsEnvelope {
          final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
          // Step-up is handled by the collide() function in Minecraft, which is called on every move, so one could technically step up even while ripdiing or gliding.
          return  
-                fromOnGround && toOnGround && MathUtil.almostEqual(thisMove.yDistance, attributeAccess.getHandle().getMaxStepUp(player), Magic.PREDICTION_EPSILON)
+                fromOnGround && toOnGround && thisMove.yDistance > 0.0 && thisMove.yDistance <= attributeAccess.getHandle().getMaxStepUp(player)
                 // 0: Wildcard couldstep
                 || thisMove.couldStepUp
                 // If the step-up movement doesn't fall into any of the criteria above, let the collide() function handle it instead.
