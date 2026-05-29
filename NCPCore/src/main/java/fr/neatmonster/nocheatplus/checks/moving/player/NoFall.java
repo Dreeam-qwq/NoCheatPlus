@@ -46,10 +46,12 @@ import fr.neatmonster.nocheatplus.compat.*;
 import fr.neatmonster.nocheatplus.compat.bukkit.BridgeEnchant;
 import fr.neatmonster.nocheatplus.compat.bukkit.BridgeHealth;
 import fr.neatmonster.nocheatplus.compat.bukkit.BridgeMaterial;
-import fr.neatmonster.nocheatplus.compat.versions.ClientVersion;
+import fr.neatmonster.nocheatplus.compat.versions.ServerVersion;
 import fr.neatmonster.nocheatplus.components.modifier.IAttributeAccess;
+import fr.neatmonster.nocheatplus.components.registry.activation.Activation;
 import fr.neatmonster.nocheatplus.components.registry.event.IGenericInstanceHandle;
 import fr.neatmonster.nocheatplus.components.registry.feature.TickListener;
+import fr.neatmonster.nocheatplus.logging.StaticLog;
 import fr.neatmonster.nocheatplus.players.DataManager;
 import fr.neatmonster.nocheatplus.players.IPlayerData;
 import fr.neatmonster.nocheatplus.utilities.ReflectionUtil;
@@ -57,7 +59,7 @@ import fr.neatmonster.nocheatplus.utilities.TickTask;
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
 import fr.neatmonster.nocheatplus.utilities.map.BlockFlags;
 import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
-import fr.neatmonster.nocheatplus.utilities.moving.Magic;
+import fr.neatmonster.nocheatplus.utilities.math.MathUtil;
 
 
 
@@ -80,9 +82,13 @@ public class NoFall extends Check {
     /** For temporary use: LocUtil.clone before passing deeply, call setWorld(null) after use. */
     private final Location useLoc = new Location(null, 0, 0, 0);
     private final Location useLoc2 = new Location(null, 0, 0, 0);
-    
+    private final boolean protocolLibPresent = new Activation().pluginExist("ProtocolLib").isAvailable();
     private static final IGenericInstanceHandle<IAttributeAccess> attributeAccess = NCPAPIProvider.getNoCheatPlusAPI().getGenericInstanceHandle(IAttributeAccess.class);
-    
+    // If the server don't deal fall damage, so do NCP
+    private final static boolean fallDistChange = ServerVersion.isAtLeast("1.21.11");
+    private final static boolean attributeAvailable = ServerVersion.isAtLeast("1.20.5");
+    private final static boolean hayChange = ServerVersion.isAtLeast("1.9");
+    private final static boolean bedChange = ServerVersion.isAtLeast("1.12");
     
     /**
      * Instantiates a new no fall check.
@@ -92,15 +98,42 @@ public class NoFall extends Check {
     }
 
 
+    public static double calculateFallPower(final double fallDistance, Player player) {
+        return fallDistance + (fallDistChange ? 1.0E-6D : 0D) - attributeAccess.getHandle().getSafeFallDistance(player);
+    }
+    
     /**
-     * Calculate the damage in hearts from the given fall distance.
+     * Calculate the raw damage in hearts from the given fall distance.
      *
      * @param fallDistance
      * @param player
      * @return
      */
-    public static double getDamage(final float fallDistance, Player player) {
-        return fallDistance - attributeAccess.getHandle().getSafeFallDistance(player);
+    public static double getBaseDamage(final double fallDistance, Player player) {
+        return calculateFallPower(fallDistance, player);
+    }
+    
+    /**
+     * Ceil or Floor the damage base on server version
+     *
+     * @param fallDamage
+     * @return
+     */
+    public static double getFloorOrCeilDamage(final double fallDamage) {
+        return fallDistChange ? MathUtil.floor(fallDamage) : MathUtil.ceil(fallDamage);
+    }
+    
+    /**
+     * Calculate the damage in hearts from the given fall distance.
+     *
+     * @param fallDistance
+     * @param baseMultiply The multiplier from blocks
+     * @param player
+     * @return
+     */
+    public static double getDamage(final double fallDistance, final float baseMultiply, Player player) {
+        final double baseResult = calculateFallPower(fallDistance, player) * baseMultiply * attributeAccess.getHandle().getFallDamageMultiplier(player);
+        return fallDistChange ? MathUtil.floor(baseResult) : MathUtil.ceil(baseResult);
     }
 
 
@@ -119,11 +152,11 @@ public class NoFall extends Check {
                                 final boolean reallyOnGround, final MovingData data, final MovingConfig cc,
                                 final IPlayerData pData) {
         // Get the fall distance and modify it accordingly to the fallen on block (currently only related to pointed dripstone)
-        float fallDist = getAndRunFallDistanceDependentTasks(player, y, previousSetBackY, data);
+        double fallDist = getAndRunFallDistanceDependentTasks(player, y, previousSetBackY, data);
         // Calculate damage and apply all possible modifiers.
-        double maxDamage = getDamage(fallDist, player);
-        maxDamage = applyFeatherFalling(player, applyBlockDamageModifier(player, data, maxDamage), mcAccess.getHandle().dealFallDamageFiresAnEvent().decide()) * attributeAccess.getHandle().getFallDamageMultiplier(player);
-        if (maxDamage >= Magic.MINIMUM_FALL_DAMAGE) {
+        double maxDamage = getDamage(fallDist, applyBlockDamageMultiplier(player, data), player);
+        maxDamage = applyFeatherFalling(player, maxDamage, mcAccess.getHandle().dealFallDamageFiresAnEvent().decide());
+        if (maxDamage > 0.0) {
             // Check skipping conditions.
             if (cc.noFallSkipAllowFlight && player.getAllowFlight()) {
                 data.clearNoFallData();
@@ -146,14 +179,13 @@ public class NoFall extends Check {
         }
     }
 
-
     /**
      * Get the applicable fall-distance for the given data and run some tasks related to fall-distance specifically. <br>
      * (I.e.: altering the block the player fell on (farmland, turtle eggs) or modify the fall-distance (stalagmites))
      */
-    private float getAndRunFallDistanceDependentTasks(final Player player, double y, double previousSetBackY, final MovingData data) {
+    private double getAndRunFallDistanceDependentTasks(final Player player, double y, double previousSetBackY, final MovingData data) {
         // Base fall-distance
-        float fallDist = (float) getApplicableFallHeight(player, y, previousSetBackY, data);
+        double fallDist = getApplicableFallHeight(player, y, previousSetBackY, data);
         // TODO: Need move data pTo, this location isn't updated
         Block block = player.getLocation(useLoc2).subtract(0.0, 1.0, 0.0).getBlock();
         final IPlayerData pData = DataManager.getPlayerData(player);
@@ -189,25 +221,6 @@ public class NoFall extends Check {
             useLoc2.setWorld(null);
             return fallDist;
         }
-        // 1.17+ Falling on stalagmites will multiply the fall DISTANCE (not DAMAGE) by x2, making the player vulnerable to fall damage even by just jumping on such a block
-        // TODO: Needs the supporting block mechanic in 1.20.
-        final PlayerMoveData validMove = data.playerMoves.getLatestValidMove();
-        if (BridgeMisc.hasIsFrozen() && validMove != null && validMove.toIsValid && fallDist > 0.0) {
-            final Block fallenOnBlock = player.getWorld().getBlockAt(Location.locToBlock(validMove.to.getX()), Location.locToBlock(validMove.to.getY()), Location.locToBlock(validMove.to.getZ()));
-            if (fallenOnBlock.getBlockData() instanceof PointedDripstone) {
-                PointedDripstone dripstone = (PointedDripstone) fallenOnBlock.getBlockData();
-                boolean isStalagmite = dripstone.getThickness().equals(PointedDripstone.Thickness.TIP) && dripstone.getVerticalDirection().equals(BlockFace.UP);
-                if (isStalagmite) {
-                    // Source of the formula: PointedDripstoneBlock.java -> fallOn() -> calculateFallDamage()
-                    fallDist = (fallDist + 0.5f) * 2.0f; // 0.5 is the offset, vanilla's would be 2.0 actually. We use 0.5 because we do not ceil the final fall damage, like vanilla does.
-                    useLoc2.setWorld(null);
-                    if (pData.isDebugActive(type)) {
-                        debug(player, "Player fell on a stalagmite: multiply the final fall distance by x2.");
-                    } 
-                    return fallDist;
-                }
-            }
-        }
         // TODO: Might want to clean up NoFall to only track for ground state and override as mention above 
         // (save performance, less code but packet dependent and precise ground state requirement)
         // or still maintain it
@@ -215,7 +228,7 @@ public class NoFall extends Check {
         if (fallDist - attributeAccess.getHandle().getSafeFallDistance(player) > 0.0 && data.noFallCurrentLocOnWindChargeHit != null) {
             final double lastImpulseY = data.noFallCurrentLocOnWindChargeHit.getY();
             data.clearWindChargeImpulse();
-            fallDist = (float) (lastImpulseY < y ? 0.0 : lastImpulseY - y);
+            fallDist = (lastImpulseY < y ? 0.0 : lastImpulseY - y);
         }
         useLoc2.setWorld(null);
         return fallDist;
@@ -316,24 +329,33 @@ public class NoFall extends Check {
      * @param damage The fall damage to correct.
      * @return Modified damage.
      */
-    public static double applyBlockDamageModifier(final Player player, final MovingData data, final double damage) {
+    public static float applyBlockDamageMultiplier(final Player player, final MovingData data) {
         final PlayerMoveData validMove = data.playerMoves.getLatestValidMove();
         if (validMove != null && validMove.toIsValid) {
             // TODO: Need move data pTo, this location isn't updated
             // TODO: Needs the supporting block mechanic in 1.20.
-            final Material mat = player.getWorld().getBlockAt(Location.locToBlock(validMove.to.getX()), Location.locToBlock(validMove.to.getY()), Location.locToBlock(validMove.to.getZ())).getType();
+            final Block block = player.getWorld().getBlockAt(Location.locToBlock(validMove.to.getX()), Location.locToBlock(validMove.to.getY()), Location.locToBlock(validMove.to.getZ()));
+            final Material mat = block.getType();
             if ((BlockFlags.getBlockFlags(mat) & BlockFlags.F_STICKY) != 0) {
-                return damage / 5D;
+                return 0.2f;
             }
-            final IPlayerData pData = DataManager.getPlayerData(player);
-            if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_12) && MaterialUtil.BEDS.contains(mat)) {
-                return damage / 2D;
+            if (bedChange && MaterialUtil.BEDS.contains(mat)) {
+                return 0.5f;
             }
-            if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_9) && mat == Material.HAY_BLOCK) {
-                return damage / 5D;
+            if (hayChange && mat == Material.HAY_BLOCK) {
+                return 0.2f;
+            }
+            if (BridgeMisc.hasIsFrozen()) {
+                if (block.getBlockData() instanceof PointedDripstone) {
+                    PointedDripstone dripstone = (PointedDripstone) block.getBlockData();
+                    boolean isStalagmite = dripstone.getThickness().equals(PointedDripstone.Thickness.TIP) && dripstone.getVerticalDirection().equals(BlockFace.UP);
+                    if (isStalagmite) {
+                        return 2f;
+                    }
+                }
             }
         }
-        return damage;
+        return 1f;
     }
 
 
@@ -350,13 +372,26 @@ public class NoFall extends Check {
      */
     private static double getApplicableFallHeight(final Player player, final double y, final double previousSetBackY, final MovingData data) {
         final double yDistance = Math.max(data.noFallMaxY - y, data.noFallFallDistance);
-        if (yDistance > 0.0 && data.jumpAmplifier > 0.0 && previousSetBackY != Double.NEGATIVE_INFINITY) {
+        if (yDistance > 0.0 && !attributeAvailable && data.jumpAmplifier > 0.0 && previousSetBackY != Double.NEGATIVE_INFINITY) {
             // Fall height counts below previous set-back-y.
             // TODO: Likely updating the amplifier after lift-off doesn't make sense.
             // TODO: In case of velocity... skip too / calculate max exempt height?
             final double correction = data.noFallMaxY - previousSetBackY;
             if (correction > 0.0) {
-                return (float) Math.max(0.0, yDistance - correction);
+                return Math.max(0.0, yDistance - correction);
+            }
+        }
+        // TODO: Needs the supporting block mechanic in 1.20.
+        final PlayerMoveData validMove = data.playerMoves.getLatestValidMove();
+        if (BridgeMisc.hasIsFrozen() && validMove != null && validMove.toIsValid && yDistance > 0.0) {
+            final Block fallenOnBlock = player.getWorld().getBlockAt(Location.locToBlock(validMove.to.getX()), Location.locToBlock(validMove.to.getY()), Location.locToBlock(validMove.to.getZ()));
+            if (fallenOnBlock.getBlockData() instanceof PointedDripstone) {
+                PointedDripstone dripstone = (PointedDripstone) fallenOnBlock.getBlockData();
+                boolean isStalagmite = dripstone.getThickness().equals(PointedDripstone.Thickness.TIP) && dripstone.getVerticalDirection().equals(BlockFace.UP);
+                if (isStalagmite) {
+                    // Source of the formula: PointedDripstoneBlock.java -> fallOn() -> calculateFallDamage()
+                    return yDistance + 2D;
+                }
             }
         }
         return yDistance;
@@ -380,7 +415,7 @@ public class NoFall extends Check {
      * @return
      */
     public boolean willDealFallDamage(final Player player, final double y, final double previousSetBackY, final MovingData data) {
-        return getDamage((float) getApplicableFallHeight(player, y, previousSetBackY, data), player) - attributeAccess.getHandle().getSafeFallDistance(player) >= Magic.MINIMUM_FALL_DAMAGE;
+        return getDamage(getApplicableFallHeight(player, y, previousSetBackY, data), 1f, player) > 0D;
     }
 
 
@@ -388,23 +423,22 @@ public class NoFall extends Check {
      * 
      * @param player
      * @param minY
+     * @param previousSetBackY 
      * @param reallyOnGround
      * @param data
      */
-    private void adjustFallDistance(final Player player, final double minY, final boolean reallyOnGround, final MovingData data) {
-        final float noFallFallDistance = Math.max(data.noFallFallDistance, (float) (data.noFallMaxY - minY));
-        if (noFallFallDistance >= attributeAccess.getHandle().getSafeFallDistance(player)) {
-            final float fallDistance = player.getFallDistance();
-            if (noFallFallDistance - fallDistance >= 0.5f // TODO: Why not always adjust, if greater?
-                || noFallFallDistance >= attributeAccess.getHandle().getSafeFallDistance(player) && fallDistance < attributeAccess.getHandle().getSafeFallDistance(player)) { // Ensure damage.
-                player.setFallDistance(noFallFallDistance);
-            }
+    private void adjustFallDistance(final Player player, final double minY, double previousSetBackY, final boolean reallyOnGround, final MovingData data) {
+        boolean adjust = false;
+        if (willDealFallDamage(player, minY, previousSetBackY, data)) {
+            // Don't set fall distance yet, as they are being touch the ground, and fallDistance hasn't been updated
+            //player.setFallDistance(noFallFallDistance);
+            data.requestTrueForGround = true;
+            adjust = true;
         }
-        data.clearNoFallData();
-        // Force damage on event fire, no need air checking!
-        // TODO: Later on use deal damage and override on ground at packet level
-        // (don't have to calculate reduced damage or account for block change things)
-        data.noFallSkipAirCheck = true;
+        if (!adjust) data.clearNoFallData();
+        if (!protocolLibPresent && adjust) {
+            StaticLog.logWarning("Without ProtocolLib, deal fall damage by altering ground state won't work!");
+        }
     }
 
 
@@ -578,7 +612,7 @@ public class NoFall extends Check {
         if (cc.noFallDealDamage) {
             handleOnGround(player, minY, previousSetBackY, true, data, cc, pData);
         }
-        else adjustFallDistance(player, minY, true, data);
+        else adjustFallDistance(player, minY, previousSetBackY, true, data);
     }
 
 

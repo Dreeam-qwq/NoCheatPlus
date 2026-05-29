@@ -62,7 +62,7 @@ public class PhysicsEnvelope {
         final MovingData data = pData.getGenericInstance(MovingData.class);
         return
                     // 1:  99.9% of cases...
-                    isJumpMotion(from, to, player, fromOnGround, toOnGround)
+                    isJumpMotion(from, to, player, fromOnGround, toOnGround, false)
                     // 1: The odd one out. We can't know the ground status of the player, so this will have to do.
                     || isVerticallyConstricted(from, to, pData)
                     && (
@@ -89,7 +89,7 @@ public class PhysicsEnvelope {
      * Additionally, invoking this method sets the `headObstruction` flag.
      * @return True, if the motion qualifies as a jump.
      */
-    public static boolean isJumpMotion(final PlayerLocation from, final PlayerLocation to, final Player player, boolean fromOnGround, boolean toOnGround) {
+    public static boolean isJumpMotion(final PlayerLocation from, final PlayerLocation to, final Player player, boolean fromOnGround, boolean toOnGround, boolean checkMotion) {
         final IPlayerData pData = DataManager.getPlayerData(player);
         final MovingData data = pData.getGenericInstance(MovingData.class);
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
@@ -105,14 +105,16 @@ public class PhysicsEnvelope {
         // 1: Motion conditions.
         ////////////////////////////////////
         // Validate motion and update the headObstruction flag, if the player does actually collide with something above.
-        double jumpGain = data.liftOffEnvelope.getJumpGain(data.jumpAmplifier) * attributeAccess.getHandle().getJumpGainMultiplier(player);
-        Vector collisionVector = from.collide(new Vector(0.0, jumpGain, 0.0), fromOnGround || thisMove.fromLostGround, from.getBoundingBox());
-        thisMove.headObstructed = jumpGain != collisionVector.getY() && thisMove.yDistance >= 0.0 && !toOnGround; // For setting the flag, we don't care about the correct speed.
-        jumpGain = collisionVector.getY();
-        //if (!MathUtil.almostEqual(thisMove.yDistance, jumpGain, Magic.PREDICTION_EPSILON)) { // NOTE: This must be the current move, never the last one.
-            // This is not a jumping motion. Abort early.
-        //    return false;
-        //}
+        if (checkMotion) {
+            double jumpGain = data.liftOffEnvelope.getJumpGain(data.jumpAmplifier) * attributeAccess.getHandle().getJumpGainMultiplier(player);
+            Vector collisionVector = from.collide(new Vector(0.0, jumpGain, 0.0), fromOnGround || thisMove.fromLostGround, from.getBoundingBox());
+            thisMove.headObstructed = jumpGain != collisionVector.getY() && thisMove.yDistance >= 0.0 && !toOnGround; // For setting the flag, we don't care about the correct speed.
+            jumpGain = collisionVector.getY();
+            if (!MathUtil.almostEqual(thisMove.yDistance, jumpGain, Magic.PREDICTION_EPSILON)) { // NOTE: This must be the current move, never the last one.
+                // This is not a jumping motion. Abort early.
+                return false;
+            }
+        }
         //////////////////////////////////
         // 2: Ground conditions.
         //////////////////////////////////

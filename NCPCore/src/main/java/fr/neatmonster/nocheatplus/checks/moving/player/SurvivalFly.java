@@ -1886,7 +1886,7 @@ public class SurvivalFly extends Check {
             tags.add("onground_env");
             return new double[]{thisMove.yAllowedDistance, yDistanceAboveLimit};
         }
-        if (PhysicsEnvelope.isJumpMotion(from, to, player, fromOnGround, toOnGround)) {
+        if (PhysicsEnvelope.isJumpMotion(from, to, player, fromOnGround, toOnGround, true)) {
             // After stepping, jumping comes second.
             // Players can jump anywhere through air, so this must be checked before the actual prediction.
             thisMove.yAllowedDistance = thisMove.yDistance;

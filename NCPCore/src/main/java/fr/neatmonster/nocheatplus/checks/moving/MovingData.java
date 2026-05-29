@@ -158,6 +158,7 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     public double nextGravity = 0.0;
     /** Last gravity (normal, slowfall, custom)*/
     public double lastGravity = 0.0;
+    public boolean requestTrueForGround = false;
 
     // *----------Move / Vehicle move tracking----------*
     /** Keep track of currently processed (if) and past moves for player moving. Stored moves can be altered by modifying the int. */

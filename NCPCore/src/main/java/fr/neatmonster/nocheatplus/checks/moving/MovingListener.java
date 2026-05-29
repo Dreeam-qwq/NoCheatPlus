@@ -1546,9 +1546,9 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         else if (checkCf) {
             if (newTo == null) {
                 newTo = creativeFly.check(player, pFrom, pTo, data, cc, pData, time, tick, useBlockChangeTracker);
-                if (checkNf) {
-                    noFall.check(player, pFrom, pTo, previousSetBackY, data, cc, pData);
-                }
+                //if (checkNf) {
+                //    noFall.check(player, pFrom, pTo, previousSetBackY, data, cc, pData);
+                //}
             }
             data.sfHoverTicks = -1;
         }
@@ -2183,19 +2183,19 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         final boolean debug = pData.isDebugActive(CheckType.MOVING_NOFALL);
         boolean allowReset = true;
         float fallDistance = player.getFallDistance();
-        final float yDiff = (float) (data.noFallMaxY - loc.getY());
         final double damage = BridgeHealth.getRawDamage(event);
-        if (debug) debug(player, "Damage(FALL/PRE): " + damage + " / mc=" + player.getFallDistance() + " nf=" + data.noFallFallDistance + " yDiff=" + yDiff);
+        final float dataDist = (float) NoFall.getApplicableFallHeight(player, loc.getY(), data);
+        if (debug) debug(player, "Damage(FALL/PRE): " + damage + " / mc=" + player.getFallDistance() + " nf=" + data.noFallFallDistance + " nfr=" + dataDist);
 
         // NoFall bypass checks.
         // TODO: data.noFallSkipAirCheck is used to skip checking in general, thus move into that block or not?
         // TODO: Could consider skipping accumulated fall distance for NoFall in general as well.
+        final float mult = NoFall.applyBlockDamageMultiplier(player, data);
         if (!data.noFallSkipAirCheck) {
             
             // Cheat: let Minecraft gather and deal fall damage.
-            final float dataDist = Math.max(yDiff, data.noFallFallDistance);
-            final double dataDamage = NoFall.getDamage(dataDist, player);
-            if (damage > dataDamage + 0.5 || dataDamage <= 0.0) {
+            final double dataDamage = NoFall.getDamage(dataDist, mult, player);
+            if (damage > dataDamage || dataDamage <= 0.0) {
 
                 // Hot fix: allow fall damage in lava.
                 // TODO: Correctly model the half fall distance per in-lava move and taking fall damage in lava. 
@@ -2207,7 +2207,6 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
                 } 
                 // Fix issues when gliding down vines with elytra.
                 // Checking for velocity does not work since sometimes it can be applied after this check runs
-                // TODO: Actually find out why NoFall is running at all when still gliding, rather.
                 else if (moveInfo.from.isOnClimbable() && firstPastMove.isGliding) {
                     if (debug) debug(player, "Ignore fakefall on climbable on elytra move");
                 }
@@ -2248,11 +2247,10 @@ public class MovingListener extends CheckListener implements TickListener, IRemo
         }
         aux.returnPlayerMoveInfo(moveInfo);
         // Fall-back check (skip with jump amplifier).
-        final double maxD = data.jumpAmplifier > 0.0 ? NoFall.getDamage((float) NoFall.getApplicableFallHeight(player, loc.getY(), data), player)
-                                                     : NoFall.getDamage(Math.max(yDiff, Math.max(data.noFallFallDistance, fallDistance)), player) + (allowReset ? 0.0 : attributeAccess.getHandle().getSafeFallDistance(player));
+        final double maxD = NoFall.getDamage(Math.max(dataDist, fallDistance), mult, player);
         if (maxD > damage) {
             // TODO: respect dealDamage ?
-            double featherFallingCorrection = NoFall.applyFeatherFalling(player, NoFall.applyBlockDamageModifier(player, data, maxD), mcAccess.getHandle().dealFallDamageFiresAnEvent().decide());
+            double featherFallingCorrection = NoFall.applyFeatherFalling(player, maxD, mcAccess.getHandle().dealFallDamageFiresAnEvent().decide());
             BridgeHealth.setRawDamage(event, featherFallingCorrection);
             if (debug) {
                 debug(player, "Adjust fall damage to: " + (featherFallingCorrection != maxD ? featherFallingCorrection : maxD));
