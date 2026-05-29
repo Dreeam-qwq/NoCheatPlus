@@ -107,7 +107,7 @@ public class PhysicsEnvelope {
         // Validate motion and update the headObstruction flag, if the player does actually collide with something above.
         if (checkMotion) {
             double jumpGain = data.liftOffEnvelope.getJumpGain(data.jumpAmplifier) * attributeAccess.getHandle().getJumpGainMultiplier(player);
-            Vector collisionVector = from.collide(new Vector(0.0, jumpGain, 0.0), fromOnGround || thisMove.fromLostGround, from.getBoundingBox());
+            Vector collisionVector = from.collide(new Vector(thisMove.xDistance, jumpGain, thisMove.zDistance), fromOnGround || thisMove.fromLostGround, from.getBoundingBox());
             thisMove.headObstructed = jumpGain != collisionVector.getY() && thisMove.yDistance >= 0.0 && !toOnGround; // For setting the flag, we don't care about the correct speed.
             jumpGain = collisionVector.getY();
             if (!MathUtil.almostEqual(thisMove.yDistance, jumpGain, Magic.PREDICTION_EPSILON)) { // NOTE: This must be the current move, never the last one.

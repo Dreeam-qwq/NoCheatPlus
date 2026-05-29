@@ -1932,6 +1932,7 @@ public class SurvivalFly extends Check {
         thisMove.yAllowedDistance = forceResetMomentum || touchDownIsLost 
                                     || (lastMove.yDistance < 0.0 && (fromOnGround || thisMove.fromLostGround))
                                     || !lastMove.toIsValid ? 0.0 : lastMove.yDistance;
+        if (lastMove.headObstructed) thisMove.yAllowedDistance = 0.0;
         if (lastMove.yCorrectedDistancePre != 0.0) thisMove.yAllowedDistance = lastMove.yCorrectedDistancePre;
         // *----------stuck-speed-momentum-reset----------*
         if (TrigUtil.lengthSquared(data.lastStuckInBlockHorizontal, data.lastStuckInBlockVertical, data.lastStuckInBlockHorizontal) > 1.0E-7) {
@@ -1959,25 +1960,27 @@ public class SurvivalFly extends Check {
         // updateEntityAfterFallOn(), this function is called on the next move
         if (pData.isShiftKeyPressed() && lastMove.collideY) {
             if (yTheoreticalDistance != null) {
+                boolean bounceUp = false;
                 for (int i = 0; i < yTheoreticalDistance.length; i++) {
                     if (yTheoreticalDistance[i] < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
                         if (from.isOnBouncyBlock()) {
                             // The effect works by inverting the distance.
                             // Beds have a weaker bounce effect (BedBlock.java).
                             yTheoreticalDistance[i] = from.isOnSlimeBlock() ? -yTheoreticalDistance[i] : -yTheoreticalDistance[i] * 0.66;
+                            bounceUp = true;
                         }
                     }
                 }
-                tags.add("bounceup");
+                if (bounceUp) tags.add("bounceup");
             } else {
                 if (thisMove.yAllowedDistance < 0.0) { // NOTE: Must be the allowed distance, not the actual one (exploit)
                     if (from.isOnBouncyBlock()) {
                         // The effect works by inverting the distance.
                         // Beds have a weaker bounce effect (BedBlock.java).
                         thisMove.yAllowedDistance = from.isOnSlimeBlock() ? -thisMove.yAllowedDistance : -thisMove.yAllowedDistance * 0.66;
+                        tags.add("bounceup");
                     }
                 }
-                tags.add("bounceup");
             }
         }
         // *----------tryCheckInsideBlocks()----------*
@@ -2214,21 +2217,10 @@ public class SurvivalFly extends Check {
         // It is imperative that you pass yAllowedDistance as argument here (not the real yDistance), because if the player isn't on ground, the current motion will be used to determine it (collideY && motionY < 0.0). Passing an uncontrolled yDistance will be easily exploitable.
         if (yTheoreticalDistance == null) {
             Vector collisionVector = from.collide(new Vector(thisMove.xAllowedDistance, thisMove.yAllowedDistance, thisMove.zAllowedDistance), fromOnGround || thisMove.fromLostGround && lastMove.yDistance < 0.0, from.getBoundingBox());
-            thisMove.headObstructed = thisMove.yAllowedDistance != collisionVector.getY() && thisMove.yDistance >= 0.0 && from.seekCollisionAbove() && !fromOnGround;  // New definition of head obstruction: yDistance is checked because Minecraft considers players to be on ground when motion is explicitly negative
+            thisMove.headObstructed = thisMove.yAllowedDistance != collisionVector.getY() && thisMove.yDistance >= 0.0 && !fromOnGround;  // New definition of head obstruction: yDistance is checked because Minecraft considers players to be on ground when motion is explicitly negative
             // If this vertical move resulted in a collision, remember it.
             thisMove.collideY = collisionVector.getY() != thisMove.yAllowedDistance;
-            // Switch to descent phase after colliding above.
-            if (lastMove.headObstructed && !thisMove.headObstructed && yDirectionSwitch && thisMove.yDistance <= 0.0 && fullyInAir) { // TODO: Is the gravity-reiteration fix needed for liquids?
-                // Fix for clients not sending the "speed-reset move" to the server: player collides vertically with a ceiling, then proceeds to descend.
-                // Normally, speed is set back to 0.0 and then gravity is applied. This movement however is never actually sent to the server: what we see on the server-side is the player immediately descending (negative motion), but with motion that is still based on a previous move of 0.0 speed.
-                thisMove.yAllowedDistance = 0.0; // Simulate what the client should be doing and re-iterate gravity
-                if (BridgeMisc.hasGravity(player)) {
-                    thisMove.yAllowedDistance -= data.nextGravity; // This should be the current (next) gravity not the last one
-                }
-                thisMove.yAllowedDistance *= data.nextFrictionVertical;
-                tags.add("gravity_reiterate");
-            } 
-            else thisMove.yAllowedDistance = collisionVector.getY();
+            thisMove.yAllowedDistance = collisionVector.getY();
         }
         else {
             for (int i = 0; i < yTheoreticalDistance.length; i++) {
@@ -2237,8 +2229,9 @@ public class SurvivalFly extends Check {
                     // This theoretical speed would result in a collision. Remember it.
                     collideLiquidY[i] = true;
                 }
+                //TODO: Might wrong if underliquid as not all moves are headObstructed
+                thisMove.headObstructed = yTheoreticalDistance[i] != collisionVector.getY() && thisMove.yDistance >= 0.0 && !fromOnGround;
                 yTheoreticalDistance[i] = collisionVector.getY();
-                thisMove.headObstructed = yTheoreticalDistance[i] != collisionVector.getY() && thisMove.yDistance >= 0.0 && from.seekCollisionAbove() && !fromOnGround;
             }
         }
         

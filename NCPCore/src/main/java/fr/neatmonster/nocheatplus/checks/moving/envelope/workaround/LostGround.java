@@ -38,7 +38,6 @@ import fr.neatmonster.nocheatplus.utilities.TickTask;
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
 import fr.neatmonster.nocheatplus.utilities.map.BlockCache;
 import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
-import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 import fr.neatmonster.nocheatplus.utilities.math.MathUtil;
 import fr.neatmonster.nocheatplus.utilities.moving.Magic;
 import fr.neatmonster.nocheatplus.utilities.moving.MovingUtil;
@@ -87,12 +86,7 @@ public class LostGround {
         }
         
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
-        // Very specific case with players jumping with head obstructed by lanterns or after respawning
-        // TODO: Is this still relevant? (Likely not)
-        if (hDistance <= Magic.Minecraft_minMoveSqDistance_legacy && from.isOnGround(Magic.Minecraft_minMoveSqDistance_legacy)
-            && (MaterialUtil.LANTERNS.contains(from.getBlockType(from.getBlockX(), Location.locToBlock(from.getY() + 2.0), from.getBlockZ())) || data.joinOrRespawn)) {
-            return applyLostGround(player, from, true, thisMove, data, "0.03", tags);
-        }
+        // TODO: Really?
         if (!MathUtil.inRange(0.0001, hDistance, 1.5)) { 
             // Lost ground only happens with enough horizontal motion and not too much either.
             return false;
