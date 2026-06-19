@@ -80,7 +80,7 @@ public class MCAccessBukkitBase implements MCAccess {
          * Skip fully passable blocks (partially passable blocks may be itchy,
          * though slabs will be easy to handle).
          */
-        if (BlockFlags.hasAnyFlag(flags, BlockFlags.F_IGN_PASSABLE)) {
+        if (BlockFlags.hasAnyFlag(flags, BlockFlags.F_IGN_PASSABLE_CHECK)) {
             // TODO: Blocks with min_height may actually be ok, if xz100 and some height are set.
             if (BlockFlags.hasNoFlags(flags, 
                     BlockFlags.F_GROUND_HEIGHT 

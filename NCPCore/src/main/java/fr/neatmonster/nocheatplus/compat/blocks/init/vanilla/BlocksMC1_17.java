@@ -26,7 +26,7 @@ public class BlocksMC1_17 implements BlockPropertiesSetup {
     @Override
     public void setupBlockProperties(WorldConfigProvider<?> worldConfigProvider) {
         BlockProperties.setBlockProps("LIGHT", BlockProperties.indestructibleType);
-        BlockFlags.addFlags("LIGHT", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("LIGHT", BlockFlags.F_IGN_PASSABLE_CHECK );
 
         for (Material mat : MaterialUtil.ALL_CANDLES) {
             BlockFlags.addFlags(mat, BlockFlags.SOLID_GROUND);
@@ -108,9 +108,9 @@ public class BlocksMC1_17 implements BlockPropertiesSetup {
         BlockProperties.setBlockProps("BIG_DRIPLEAF", new BlockProperties.BlockProps(BlockProperties.woodAxe, 0.1f));
         BlockProperties.setBlockProps("BIG_DRIPLEAF_STEM", new BlockProperties.BlockProps(BlockProperties.woodAxe, 0.1f));
 
-        BlockFlags.addFlags("BIG_DRIPLEAF_STEM", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("BIG_DRIPLEAF_STEM", BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockProperties.setBlockProps("GLOW_LICHEN", new BlockProperties.BlockProps(BlockProperties.woodAxe, 0.2f));
-        BlockFlags.addFlags("GLOW_LICHEN", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("GLOW_LICHEN", BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockFlags.addFlags("CAVE_VINES", BlockFlags.F_CLIMBABLE);
         BlockFlags.addFlags("CAVE_VINES_PLANT", BlockFlags.F_CLIMBABLE);
         

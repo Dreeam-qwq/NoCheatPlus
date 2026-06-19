@@ -285,7 +285,7 @@ public abstract class AbstractBlockDirectionCheck<D extends ICheckData, C extend
     private static boolean isDirectionBlocked(Block block, List<BlockFace> interactableFaces, BlockFace tface, boolean hasFullBounds) {
     	if (hasFullBounds) {
     		final long blockRelativeFlags = BlockFlags.getBlockFlags(block.getRelative(tface).getType());
-    		return (blockRelativeFlags & BlockFlags.F_IGN_PASSABLE) == 0
+    		return (blockRelativeFlags & BlockFlags.F_IGN_PASSABLE_CHECK) == 0
     	            && (blockRelativeFlags & BlockFlags.F_HEIGHT100) != 0 
                     && (blockRelativeFlags & BlockFlags.F_XZ100) != 0;
     	} 
@@ -294,7 +294,7 @@ public abstract class AbstractBlockDirectionCheck<D extends ICheckData, C extend
     		    final long blockRelativeFlags = BlockFlags.getBlockFlags(block.getRelative(face).getType());
     		    final boolean relativeFullBounds = (blockRelativeFlags & BlockFlags.F_HEIGHT100) != 0 
                                                     && (blockRelativeFlags & BlockFlags.F_XZ100) != 0;
-    		    if (!relativeFullBounds || (blockRelativeFlags & BlockFlags.F_IGN_PASSABLE) == 0) return false;
+    		    if (!relativeFullBounds || (blockRelativeFlags & BlockFlags.F_IGN_PASSABLE_CHECK) == 0) return false;
     	    }
         }
     	return true;

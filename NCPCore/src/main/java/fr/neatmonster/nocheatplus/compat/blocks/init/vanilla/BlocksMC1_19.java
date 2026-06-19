@@ -55,7 +55,7 @@ public class BlocksMC1_19 implements BlockPropertiesSetup {
         BlockInit.setAs("MUD_BRICK_WALL", Material.ANDESITE_WALL);
 
         BlockProperties.setBlockProps("FROGSPAWN", BlockProperties.instantType);
-        BlockFlags.setBlockFlags("FROGSPAWN", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags("FROGSPAWN", BlockFlags.F_IGN_PASSABLE_CHECK);
 
         BlockFlags.setFlagsAs("MUDDY_MANGROVE_ROOTS", Material.DIRT);
         BlockProperties.setBlockProps("MUDDY_MANGROVE_ROOTS", new BlockProperties.BlockProps(BlockProperties.woodSpade, 0.7f));
@@ -64,7 +64,7 @@ public class BlocksMC1_19 implements BlockPropertiesSetup {
 
         BlockProperties.setBlockProps("MANGROVE_ROOTS", new BlockProperties.BlockProps(BlockProperties.woodAxe, 0.7f));
         
-        BlockFlags.setBlockFlags("SCULK_VEIN", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags("SCULK_VEIN", BlockFlags.F_IGN_PASSABLE_CHECK);
 
         BlockProperties.setBlockProps("SCULK_VEIN", new BlockProperties.BlockProps(BlockProperties.woodHoe, 0.2f));
 

@@ -492,7 +492,7 @@ public class BlockPlaceListener extends CheckListener {
                 }
                 else {
                     final Material mat = player.getLocation(useLoc2).getBlock().getType();
-                    final long flags = BlockFlags.F_CLIMBABLE | BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE;
+                    final long flags = BlockFlags.F_CLIMBABLE | BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE_CHECK;
                     if (!BlockProperties.isAir(mat) && (BlockFlags.getBlockFlags(mat) & flags) == 0 && !mcAccess.getHandle().hasGravity(mat)) {
                         // Still fails on piston traps etc.
                         if (!BlockProperties.isPassable(player.getLocation(), projectile.getLocation()) 

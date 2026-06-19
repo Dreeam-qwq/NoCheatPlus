@@ -108,7 +108,7 @@ public class BlockInit {
      */
     public static void setInstantPassable(String newId) {
 
-        BlockFlags.setBlockFlags(newId, BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags(newId, BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockProperties.setBlockProps(newId, BlockProperties.instantType);
     }
 
@@ -117,7 +117,7 @@ public class BlockInit {
      * @param newId
      */
     public static void setInstantPassable(Material newId) {
-        BlockFlags.setBlockFlags(newId, BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setBlockFlags(newId, BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockProperties.setBlockProps(newId, BlockProperties.instantType);
     }
 

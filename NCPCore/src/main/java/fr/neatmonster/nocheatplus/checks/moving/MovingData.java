@@ -35,7 +35,9 @@ import fr.neatmonster.nocheatplus.checks.moving.model.LiftOffEnvelope;
 import fr.neatmonster.nocheatplus.checks.moving.model.MoveConsistency;
 import fr.neatmonster.nocheatplus.checks.moving.model.MoveTrace;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerKeyboardInput;
+import fr.neatmonster.nocheatplus.checks.moving.envelope.PhysicsGroundResolver;
 import fr.neatmonster.nocheatplus.checks.moving.model.PlayerMoveData;
+import fr.neatmonster.nocheatplus.checks.net.model.DataPacketFlying;
 import fr.neatmonster.nocheatplus.checks.moving.model.VehicleMoveData;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.PairAxisVelocity;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.PairEntry;
@@ -156,6 +158,7 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
     public double nextGravity = 0.0;
     /** Last gravity (normal, slowfall, custom)*/
     public double lastGravity = 0.0;
+    public boolean requestTrueForGround = false;
 
     // *----------Move / Vehicle move tracking----------*
     /** Keep track of currently processed (if) and past moves for player moving. Stored moves can be altered by modifying the int. */
@@ -164,7 +167,7 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         public PlayerMoveData call() throws Exception {
             return new PlayerMoveData();
         }
-    }, 4); 
+    }, 2); 
     /** Keep track of currently processed (if) and past moves for vehicle moving. Stored moves can be altered by modifying the int. */
     // TODO: There may be need to store such data with vehicles, or detect tandem abuse in a different way.
     public final MoveTrace <VehicleMoveData> vehicleMoves = new MoveTrace<VehicleMoveData>(new Callable<VehicleMoveData>() {
@@ -181,6 +184,14 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
      * This data is stored in MovingData instead of the Moving trace, as the latter may be invalidated, overridden or otherwise wiped out, while the input state is still valid and needed for the next move(s); it is not suitable for long-term storage.
      */
     public PlayerKeyboardInput input = new PlayerKeyboardInput();
+
+    /** Pending client onGround for the next {@link fr.neatmonster.nocheatplus.checks.moving.MovingListener#checkPlayerMove}. */
+    public boolean pendingHasClientFromOnGround;
+    public boolean pendingClientFromOnGround;
+    public boolean pendingHasClientToOnGround;
+    public boolean pendingClientToOnGround;
+    public boolean pendingHasClientToHorizontalCollision;
+    public boolean pendingClientToHorizontalCollision;
 
     // *----------Velocity handling----------* 
     /** Tolerance value for using vertical velocity (the client sends different values than received with fight damage). */
@@ -390,7 +401,7 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         // Reset to setBack.
         resetPlayerPositions(setBack);
         adjustLiftOffEnvelope(setBack);
-        adjustMediumProperties(loc, cc, player, playerMoves.getCurrentMove());
+        adjustMediumProperties(player, setBack);
         // Only setSetBack if no set back location is there.
         if (setBack == null) {
             setSetBack(setBack);
@@ -415,16 +426,16 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
 
     /**
      * Adjust medium properties according to the medium.
-     * @param loc
-     * @param cc
+     *
      * @param player
+     * @param from
      */
-    public void adjustMediumProperties(final Location loc, final MovingConfig cc, final Player player, final PlayerMoveData thisMove) {
-        nextFrictionHorizontal = BlockProperties.getHorizontalFrictionFactor(player, loc, cc.yOnGround, thisMove);
-        nextStuckInBlockHorizontal = BlockProperties.getStuckInBlockHorizontalFactor(player, loc, cc.yOnGround, thisMove);
-        nextBlockSpeedMultiplier = MathUtil.lerp(attributeAccess.getHandle().getMovementEfficiency(player), BlockProperties.getBlockSpeedFactor(player, loc, cc.yOnGround, thisMove), 1.0f);
-        nextFrictionVertical = BlockProperties.getVerticalFrictionFactor(player, loc, cc.yOnGround, thisMove);
-        nextStuckInBlockVertical = BlockProperties.getStuckInBlockVerticalFactor(player, loc, cc.yOnGround, thisMove);
+    public void adjustMediumProperties(final Player player, final PlayerLocation from) {
+        nextFrictionHorizontal = BlockProperties.getHorizontalFrictionFactor(player, from);
+        nextStuckInBlockHorizontal = BlockProperties.getStuckInBlockHorizontalFactor(player, from);
+        nextBlockSpeedMultiplier = MathUtil.lerp(attributeAccess.getHandle().getMovementEfficiency(player), BlockProperties.getBlockSpeedFactor(player, from), 1.0f);
+        nextFrictionVertical = BlockProperties.getVerticalFrictionFactor(player, from);
+        nextStuckInBlockVertical = BlockProperties.getStuckInBlockVerticalFactor(player, from);
     }
     
     /**
@@ -439,6 +450,59 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         thisMove.hasImpulse = AlmostBoolean.NO;
         thisMove.strafeImpulse = PlayerKeyboardInput.StrafeDirection.NONE;
         thisMove.forwardImpulse = PlayerKeyboardInput.ForwardDirection.NONE;
+    }
+
+    /**
+     * Packet-split segment: onGround from matched flying packets.
+     *
+     * @param trustHorizontalCollision {@code true} when the server protocol exposes horizontal collision (1.21.3+).
+     */
+    public void setPendingClientPacketGround(final DataPacketFlying fromPacket,
+            final DataPacketFlying toPacket,
+            final boolean trustHorizontalCollision) {
+        pendingHasClientFromOnGround = fromPacket != null;
+        pendingClientFromOnGround = fromPacket != null && fromPacket.onGround;
+        pendingHasClientToOnGround = toPacket != null;
+        pendingClientToOnGround = toPacket != null && toPacket.onGround;
+        pendingHasClientToHorizontalCollision = trustHorizontalCollision && toPacket != null;
+        pendingClientToHorizontalCollision = toPacket != null && toPacket.horizontalCollision;
+    }
+
+    /**
+     * Normal / Bukkit-split move: {@link org.bukkit.entity.Player#isOnGround()} at the segment end (to).
+     * Segment start (from) uses the previous segment's to ground when available.
+     */
+    public void setPendingBukkitGround(final org.bukkit.entity.Player player, final PlayerMoveData lastMove) {
+        pendingHasClientToOnGround = true;
+        pendingClientToOnGround = player.isOnGround();
+        if (lastMove.toIsValid && lastMove.hasClientToOnGround) {
+            pendingHasClientFromOnGround = true;
+            pendingClientFromOnGround = lastMove.clientToOnGround;
+        }
+        else {
+            pendingHasClientFromOnGround = true;
+            pendingClientFromOnGround = pendingClientToOnGround;
+        }
+        pendingHasClientToHorizontalCollision = false;
+    }
+
+    public void clearPendingClientPacketGround() {
+        pendingHasClientFromOnGround = false;
+        pendingHasClientToOnGround = false;
+        pendingHasClientToHorizontalCollision = false;
+    }
+
+    public void applyPendingClientPacketGround(final PlayerMoveData move) {
+        if (!pendingHasClientFromOnGround && !pendingHasClientToOnGround) {
+            PhysicsGroundResolver.clearClientPacketGround(move);
+            clearPendingClientPacketGround();
+            return;
+        }
+        PhysicsGroundResolver.bindClientGround(move,
+                pendingClientFromOnGround, pendingHasClientFromOnGround,
+                pendingClientToOnGround, pendingHasClientToOnGround,
+                pendingClientToHorizontalCollision, pendingHasClientToHorizontalCollision);
+        clearPendingClientPacketGround();
     }
 
 
@@ -547,6 +611,24 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
         morePacketsFreq.clear(now);
         morePacketsBurstFreq.clear(now);
         // TODO: Also reset other data ?
+    }
+
+
+    public void onExternalTeleportResync(final Location loc) {
+        // Teleport/Folia support: NET_MOVING accepted a stale pre-teleport packet, so old move history must not
+        // remain available as a future setback target.
+        playerMoves.invalidate();
+        clearPlayerMorePacketsData();
+        sfJumpPhase = 0;
+        sfHoverTicks = -1;
+        verticalBounce = null;
+        timeSinceSetBack = 0;
+        if (loc != null && loc.getWorld() != null) {
+            // Folia/teleport safety: packet models can carry coordinate-only targets, but set backs need a real world.
+            setSetBack(loc);
+        }
+        resetTeleported();
+        joinOrRespawn = false;
     }
 
 
@@ -835,14 +917,14 @@ public class MovingData extends ACheckData implements IDataOnRemoveSubCheckData,
      * Set on {@link org.bukkit.event.player.PlayerRiptideEvent} to "MAYBE", as we don't yet know whether the riptide push is applied with or without the 1.2 vertical move from ground.
      */
     public void setTridentReleaseEvent(AlmostBoolean isReleased) {
-        tridentRelease = isReleased;
+        tridentRelease = isReleased == null ? AlmostBoolean.NO : isReleased;
     }
 
     /**
      * Set when pass to PlayerMoveData, also reset state
      */
     public AlmostBoolean consumeTridentReleaseEvent() {
-        final AlmostBoolean result = tridentRelease;
+        final AlmostBoolean result = tridentRelease == null ? AlmostBoolean.NO : tridentRelease;
         tridentRelease = AlmostBoolean.NO;
         return result;
     }

@@ -99,8 +99,10 @@ public class Magic {
     public static final double CraftBukkit_minMoveDist = 0.0625; // Math.sqrt(CraftBukkit_minMoveSqDist);
     /** Minimum looking direction change for bukkit to fire PlayerMoveEvents. PlayerConnection.java */
     public static final float CraftBukkit_minLookChange = 10f;
-    /** The minimum squared distance for clients to send flying packets to the server (EntityPlayerSP/LocalPlayer.java, sendPosition()): movements smaller than this are not sent. (Thanks Mojang!) */
-    public static final double Minecraft_minMoveSqDistance = 0.03;
+    /** The minimum squared distance for clients to send flying packets to the server ({@code EntityPlayerSP}/{@code LocalPlayer.java}, {@code sendPosition()}): movements smaller than this are not sent. (Thanks Mojang!) */
+    public static final double Minecraft_minMoveSqDistance_legacy = 0.03;
+    /** Mirror of {@link #Minecraft_minMoveSqDistance_legacy} but for 1.18.2 and above */ 
+    public static final double Minecraft_minMoveSqDist_modern = 0.0002;
     
 
     
@@ -112,6 +114,18 @@ public class Magic {
     public static final double PAPER_DIST = 0.01;
     /** The margin of error tolerated by predictions */
     public static final double PREDICTION_EPSILON = 0.0001;
+    /** Minimum match tolerance for sneak-edge corner recovery (post-collide vs packet). */
+    public static final double EDGE_SNEAK_CORNER_MATCH_TOLERANCE_MIN = 0.02;
+    /** Maximum match tolerance for sneak-edge corner recovery (swift sneak / speed potions). */
+    public static final double EDGE_SNEAK_CORNER_MATCH_TOLERANCE_MAX = 0.14;
+    /** Scales corner match tolerance from the reference horizontal speed of the tick. */
+    public static final double EDGE_SNEAK_CORNER_MATCH_SPEED_RATIO = 0.45;
+    /** Floor for sneak-edge packet-trust bypass (per-tick horizontal distance). */
+    public static final double EDGE_SNEAK_BYPASS_MAX_HDIST = 0.15;
+    /** Ceiling for sneak-edge bypass (swift sneak + speed potion). */
+    public static final double EDGE_SNEAK_BYPASS_MAX_HDIST_HARD = 0.36;
+    /** Scales bypass cap from {@code MovingData.walkSpeed}. */
+    public static final double EDGE_SNEAK_BYPASS_WALK_SPEED_FACTOR = 4.5;
     /**
      * Absolute vertical distance that players can cover with a single move
      */
@@ -163,8 +177,6 @@ public class Magic {
     // *----------Falling distance / damage / Nofall----------*
     /** The lower bound of fall distance for taking fall damage. */
     public static final double FALL_DAMAGE_DIST = 3.0;
-    /** The minimum damage amount that actually should get applied. */
-    public static final double MINIMUM_FALL_DAMAGE = 0.5;
     /**
      * The maximum distance that can be achieved with bouncing back from slime
      * blocks.

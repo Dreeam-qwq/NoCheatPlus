@@ -246,7 +246,7 @@ public class BlockProperties {
         public final boolean pureHardness;
 
         /**
-         * Instantiates a new block props.
+         * Instantiates a new block props that can be harvested by hand.
          *
          * @param tool
          *            The tool type that allows access to breaking times other
@@ -259,7 +259,7 @@ public class BlockProperties {
         }
 
         /**
-         * Instantiates a new block props.
+         * Instantiates a new block props, indicating whether it can be harvested by hand or not.
          *
          * @param tool
          *            The tool type that allows access to breaking times other
@@ -283,19 +283,19 @@ public class BlockProperties {
          *            the hardness
          * @param efficiencyMod
          *            the efficiency mod
-         * @param requireCorrectTool
+         * @param requireCorrectToolToLoot
          *            false if block can be collected using bare hand to mine and vice versa
          */
-        public BlockProps(ToolProps tool, float hardness, float efficiencyMod, boolean requireCorrectTool) {
+        public BlockProps(ToolProps tool, float hardness, float efficiencyMod, boolean requireCorrectToolToLoot) {
             pureHardness = true;
             this.tool = tool;
             this.hardness = hardness;
-            this.requireCorrectTool = requireCorrectTool;
+            this.requireCorrectTool = requireCorrectToolToLoot;
             breakingTimes = new long[7];
             breakingTimes[0] = (long) (1000f * 5f * hardness);
             boolean noTool = tool.materialBase == null || tool.toolType == null || tool.toolType == ToolType.NONE;//|| tool.materialBase == MaterialBase.NONE;
 
-            if (noTool || !requireCorrectTool) {
+            if (noTool || !requireCorrectToolToLoot) {
                 breakingTimes[0] *= 0.3;
             }
 
@@ -508,31 +508,23 @@ public class BlockProperties {
 
     /**
      * NMS friction factors library for vertical motion
-     * 
+     *
      * @param entity
-     * @param location Inaccurate with split moves, should be avoided.
-     * @param yOnGround
-     * @param thisMove Should be used over location to compose the correct position (split moves) 
-     * @return the factor 
+     * @param from   Should be used over location to compose the correct position (split moves)
+     * @return the factor
      */
-    public static final double getVerticalFrictionFactor(final LivingEntity entity, final Location location, final double yOnGround, PlayerMoveData thisMove) {
-        final BlockCache blockCache = wrapBlockCache.getBlockCache();
-        blockCache.setAccess(location.getWorld());
-        if (entity instanceof Player) {
-            blockCache.setPlayerData(DataManager.getPlayerData((Player)entity));
-        }
-        eLoc.setBlockCache(blockCache);
-        Location loc = new Location(location.getWorld(), thisMove.from.getX(), thisMove.from.getY(), thisMove.from.getZ());
-        eLoc.set(loc, entity, yOnGround);
+    public static final double getVerticalFrictionFactor(final LivingEntity entity, PlayerLocation from) {
         double friction;
-        if (eLoc.isInWater()) {
-            thisMove.submergedWaterHeight = eLoc.getSubmergedLiquidHeight(BlockFlags.F_WATER);
+        // TODO: Need to adapt for ridable entities later on.
+        final PlayerMoveData thisMove = DataManager.getPlayerData((Player) entity).getGenericInstance(MovingData.class).playerMoves.getCurrentMove();
+        if (from.isInWater()) {
+            thisMove.submergedWaterHeight = from.getSubmergedLiquidHeight(BlockFlags.F_WATER);
             friction = Magic.WATER_VERTICAL_INERTIA;
         }
-        else if (eLoc.isInLava()) {
-            double liquidHeight = eLoc.getSubmergedLiquidHeight(BlockFlags.F_LAVA);
+        else if (from.isInLava()) {
+            double liquidHeight = from.getSubmergedLiquidHeight(BlockFlags.F_LAVA);
             thisMove.submergedLavaHeight = liquidHeight;
-            if (liquidHeight <= (eLoc.getEyeHeight() < 0.4D ? 0.0D : 0.4D)) {
+            if (liquidHeight <= (from.getEyeHeight() < 0.4D ? 0.0D : 0.4D)) {
                 friction = Magic.WATER_VERTICAL_INERTIA;
             }
             else friction = Magic.LAVA_VERTICAL_INERTIA;
@@ -540,8 +532,6 @@ public class BlockProperties {
         else {
             friction = Magic.FRICTION_MEDIUM_AIR;
         }
-        blockCache.cleanup();
-        eLoc.cleanup();
         return friction;
     }
     
@@ -549,24 +539,10 @@ public class BlockProperties {
      * NMS block friction library for horizontal speed
      *
      * @param entity
-     * @param rawLoc Non-corrected location (split moves, looking direction (...) See MovingListener.java, split move mechanic), should be avoided.
-     * @param yOnGround
-     * @param thisMove Movement to compose the corrected location's coordinate with.
+     * @param from   Movement to compose the corrected location's coordinate with.
      * @return the factor
      */
-    public static final float getHorizontalFrictionFactor(final LivingEntity entity, final Location rawLoc, final double yOnGround, PlayerMoveData thisMove) {
-        // Set-up caching
-        final BlockCache blockCache = wrapBlockCache.getBlockCache();
-        if (entity instanceof Player) {
-            // Flying players are ignored by the game.
-            if (((Player) entity).isFlying() || Bridge1_9.isGliding(entity)) return 1.0f;
-            blockCache.setPlayerData(DataManager.getPlayerData((Player)entity));
-        }
-        blockCache.setAccess(rawLoc.getWorld());
-        eLoc.setBlockCache(blockCache);
-        // Compose and set the split-move-corrected location.
-        final Location correctedLoc = new Location(rawLoc.getWorld(), thisMove.from.getX(), thisMove.from.getY(), thisMove.from.getZ());
-        eLoc.set(correctedLoc, entity, yOnGround);
+    public static final float getHorizontalFrictionFactor(final LivingEntity entity, PlayerLocation from) {
         ////////////////////////////////////////////////////////////////
         // Determine which position should be used to grab the block. // 
         ////////////////////////////////////////////////////////////////
@@ -576,10 +552,10 @@ public class BlockProperties {
         final Material blockBelow;
         // On 1.20, the block that is closest to the player position is considered, not the one on which the player is at the center.
         if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_20)) {
-            BlockCoord supportingBlock = SupportingBlockUtils.getOnPos(blockCache, eLoc.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
-            blockBelow = eLoc.getBlockType(supportingBlock.getX(), supportingBlock.getY(), supportingBlock.getZ());
+            BlockCoord supportingBlock = SupportingBlockUtils.getOnPos(from.getBlockCache(), from.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
+            blockBelow = from.getBlockType(supportingBlock.getX(), supportingBlock.getY(), supportingBlock.getZ());
         }
-        else blockBelow = eLoc.getBlockType(eLoc.getBlockX(), Location.locToBlock(eLoc.getY() - yBelow), eLoc.getBlockZ());
+        else blockBelow = from.getBlockType(from.getBlockX(), Location.locToBlock(from.getY() - yBelow), from.getBlockZ());
         //////////////////////////////////////////////////////////////
         // Finally, determine the friction for the grabbed block.   //
         //////////////////////////////////////////////////////////////
@@ -594,8 +570,6 @@ public class BlockProperties {
         else if (isSlime(blockBelow)) {
             friction = 0.8f;
         }
-        blockCache.cleanup();
-        eLoc.cleanup();
         return friction;
     }
 
@@ -603,38 +577,28 @@ public class BlockProperties {
      * NMS stuck-in-block vertical speed factor library.
      *
      * @param entity
-     * @param location  Inaccurate with split moves, should be avoided.
-     * @param yOnGround
-     * @param thisMove  Should be used over location to compose the correct position (split moves)
+     * @param from   Should be used over location to compose the correct position (split moves)
      * @return the factor
      */
-    public static final double getStuckInBlockVerticalFactor(final LivingEntity entity, final Location location, final double yOnGround, PlayerMoveData thisMove) {
-        final BlockCache blockCache = wrapBlockCache.getBlockCache();
+    public static final double getStuckInBlockVerticalFactor(final LivingEntity entity, PlayerLocation from) {
         if (entity instanceof Player) {
             // Flying player are ignored by the game.
             if (((Player) entity).isFlying()) return 1.0f;
-            blockCache.setPlayerData(DataManager.getPlayerData((Player)entity));
         }
-        blockCache.setAccess(location.getWorld());
-        eLoc.setBlockCache(blockCache);
-        Location loc = new Location(location.getWorld(), thisMove.from.getX(), thisMove.from.getY(), thisMove.from.getZ());
-        eLoc.set(loc, entity, yOnGround);
         double stuckInFactor = 1.0;
-        if (eLoc.isInBerryBush()) {
+        if (from.isInBerryBush()) {
             stuckInFactor = 0.75;
         }
-        else if (eLoc.isInPowderSnow()) {
+        else if (from.isInPowderSnow()) {
             stuckInFactor = 1.5;
         }
-        else if (eLoc.isInWeb()) {
+        else if (from.isInWeb()) {
             // Introduced roughly in 1.20.5
             if (BridgePotionEffect.WEAVING != null && entity.hasPotionEffect(PotionEffectType.WEAVING)) {
                 stuckInFactor = 0.25;
             }
             else stuckInFactor = 0.05;
         }
-        blockCache.cleanup();
-        eLoc.cleanup();
         return stuckInFactor;
     }
     
@@ -642,37 +606,27 @@ public class BlockProperties {
      * NMS stuck-in-block factor library for horizontal speed.
      *
      * @param entity
-     * @param rawLoc
-     * @param yOnGround
-     * @param thisMove
+     * @param from
      */
-    public static final double getStuckInBlockHorizontalFactor(final LivingEntity entity, final Location rawLoc, final double yOnGround, final PlayerMoveData thisMove) {
-        final BlockCache blockCache = wrapBlockCache.getBlockCache();
+    public static final double getStuckInBlockHorizontalFactor(final LivingEntity entity, final PlayerLocation from) {
         if (entity instanceof Player) {
             // Flying player are ignored by the game.
             if (((Player) entity).isFlying()) return 1.0f;
-            blockCache.setPlayerData(DataManager.getPlayerData((Player)entity));
         }
-        blockCache.setAccess(rawLoc.getWorld());
-        Location loc = new Location(rawLoc.getWorld(), thisMove.from.getX(), thisMove.from.getY(), thisMove.from.getZ());
-        eLoc.setBlockCache(blockCache);
-        eLoc.set(loc, entity, yOnGround);
         double stuckInFactor = 1.0D;
-        if (eLoc.isInWeb()) {
+        if (from.isInWeb()) {
             if (BridgePotionEffect.WEAVING != null && entity.hasPotionEffect(PotionEffectType.WEAVING)) {
                 // Introduced roughly in 1.20.5
                 stuckInFactor = 0.5D;
             }
             else stuckInFactor = 0.25D;
         }
-        else if (eLoc.isInBerryBush()) {
+        else if (from.isInBerryBush()) {
             stuckInFactor = 0.8D;
         }
-        else if (eLoc.isInPowderSnow()) {
+        else if (from.isInPowderSnow()) {
             stuckInFactor = 0.9D;
         }
-        blockCache.cleanup();
-        eLoc.cleanup();
         return stuckInFactor;
     }
 
@@ -681,25 +635,16 @@ public class BlockProperties {
      * This is retrieved according to how vanilla does it (Entity.java, getBlockSpeedFactor()).
      *
      * @param entity
-     * @param rawLoc Non-corrected location (split moves, looking direction (...) See MovingListener.java, split move mechanic), should be avoided.
-     * @param yOnGround
-     * @param thisMove Movement to compose the corrected location's coordinate with.
+     * @param from   Movement to compose the corrected location's coordinate with.
      */
-    public static final float getBlockSpeedFactor(final LivingEntity entity, final Location rawLoc, final double yOnGround, PlayerMoveData thisMove) {
-        final BlockCache blockCache = wrapBlockCache.getBlockCache();
+    public static final float getBlockSpeedFactor(final LivingEntity entity, PlayerLocation from) {
         if (entity instanceof Player) {
             // Flying player are ignored by the game.
             if (((Player) entity).isFlying() || Bridge1_9.isGliding(entity)) return 1.0f;
-
-            blockCache.setPlayerData(DataManager.getPlayerData((Player)entity));
         }
         final IPlayerData pData = DataManager.getPlayerData((Player) entity);
-        blockCache.setAccess(rawLoc.getWorld());
-        eLoc.setBlockCache(blockCache);
-        final Location correctedLoc = new Location(rawLoc.getWorld(), thisMove.from.getX(), thisMove.from.getY(), thisMove.from.getZ());
-        eLoc.set(correctedLoc, entity, yOnGround);
         float speedFactor = 1.0f;
-        final Material blockBelow = eLoc.getBlockType();
+        final Material blockBelow = from.getBlockType();
         // NOTE: Technically, vanilla's order is inverted: honey block is checked first, then soul sand.
         // Might be a problem with when standing on half-and-half.
         if (blockBelow == Material.SOUL_SAND) {
@@ -718,10 +663,10 @@ public class BlockProperties {
             final Material blockBelow2;
             // On 1.20, the block that is closest to the player position is considered, not the one on which the player is at the center.
             if (pData.getClientVersion().isAtLeast(ClientVersion.V_1_20)) {
-                BlockCoord supportingBlock = SupportingBlockUtils.getOnPos(blockCache, eLoc.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
-                blockBelow2 = eLoc.getBlockType(supportingBlock.getX(), supportingBlock.getY(), supportingBlock.getZ());
+                BlockCoord supportingBlock = SupportingBlockUtils.getOnPos(from.getBlockCache(), from.getLocation(), pData.getSupportingBlockData(), (float)yBelow);
+                blockBelow2 = from.getBlockType(supportingBlock.getX(), supportingBlock.getY(), supportingBlock.getZ());
             }
-            else blockBelow2 = eLoc.getBlockType(eLoc.getBlockX(), Location.locToBlock(eLoc.getY() - yBelow), eLoc.getBlockZ());
+            else blockBelow2 = from.getBlockType(from.getBlockX(), Location.locToBlock(from.getY() - yBelow), from.getBlockZ());
             if (blockBelow2 == Material.SOUL_SAND) {
                 speedFactor = BridgeEnchant.hasSoulSpeed((Player) entity) ? 1.0f : 0.4f;
             } 
@@ -729,8 +674,6 @@ public class BlockProperties {
                 speedFactor = 0.4f;
             }
         }
-        blockCache.cleanup();
-        eLoc.cleanup();
         return speedFactor;
     }
 
@@ -1198,9 +1141,6 @@ public class BlockProperties {
         return (BlockFlags.getBlockFlags(mat) & BlockFlags.F_WATER_PLANT) != 0;
     }
 
-    public static final boolean isDoor(final Material mat) {
-        return MaterialUtil.ALL_DOORS.contains(mat);
-    }
 
     /** Liquid height if no solid/full blocks are above. */
     public static final double LIQUID_HEIGHT_LOWERED = 8 / 9f;
@@ -1496,9 +1436,10 @@ public class BlockProperties {
         //////////////////////////////////////////////////////
         // Generic initialization.
         for (Material mat : Material.values()) {
-            BlockFlags.blockFlags.put(mat, 0L);
+            BlockFlags.flags.put(mat, 0L);
             if (mcAccess.isBlockLiquid(mat).decide()) {
                 // TODO: do not set BlockFlags.F_GROUND for liquids ?
+                // Why the fuck would a liquid block return isSolid = true??
                 BlockFlags.setFlag(mat, BlockFlags.F_LIQUID);
                 if (mcAccess.isBlockSolid(mat).decide()) BlockFlags.setFlag(mat, BlockFlags.F_SOLID);
             }
@@ -1510,18 +1451,16 @@ public class BlockProperties {
         BlockProps props;
 
         // Stairs.
-        final long stairFlags = BlockFlags.F_STAIRS | BlockFlags.F_GROUND | BlockFlags.F_SOLID;
         for (final Material mat : MaterialUtil.ALL_STAIRS) {
-            BlockFlags.setFlag(mat, stairFlags);
+            BlockFlags.setFlag(mat, BlockFlags.F_STAIRS | BlockFlags.F_GROUND | BlockFlags.F_SOLID);
         }
 
         // Step (ground + full width).
-        final long stepFlags = BlockFlags.F_GROUND | BlockFlags.F_XZ100;
         for (final Material mat : new Material[]{BridgeMaterial.STONE_SLAB,}) {
-            BlockFlags.setFlag(mat, stepFlags);
+            BlockFlags.setFlag(mat, BlockFlags.F_GROUND | BlockFlags.F_XZ100);
         }
         for (final Material mat : MaterialUtil.SLABS) {
-            BlockFlags.setFlag(mat, stepFlags);
+            BlockFlags.setFlag(mat, BlockFlags.F_GROUND | BlockFlags.F_XZ100);
         }
 
         // Rails
@@ -1530,11 +1469,13 @@ public class BlockProperties {
         }
 
         // Water
+        // TODO: Is the modeling flag needed now that we have a modeling class?
         for (final Material mat : MaterialUtil.WATER) {
             BlockFlags.setFlag(mat, BlockFlags.F_LIQUID | BlockFlags.F_HEIGHT_8SIM_DEC | BlockFlags.F_WATER);
         }
 
         // Lava
+        // TODO: Is the modeling flag needed now that we have a modeling class?
         for (final Material mat : MaterialUtil.LAVA) {
             BlockFlags.setFlag(mat, BlockFlags.F_LIQUID | BlockFlags.F_LAVA | BlockFlags.F_HEIGHT_8SIM_DEC); // Minecraft 1.13 will remove this flag.
         }
@@ -1548,7 +1489,7 @@ public class BlockProperties {
         // Ground (can stand on).
         for (final Material mat : new Material[]{
             Material.COCOA, 
-            Material.SNOW, 
+            Material.SNOW, // TODO: The first layer of snow is not ground!
             Material.LADDER,
             Material.BREWING_STAND,
             BridgeMaterial.get("DIODE_BLOCK_OFF"), 
@@ -1558,16 +1499,17 @@ public class BlockProperties {
             BridgeMaterial.LILY_PAD, 
             BridgeMaterial.PISTON_HEAD,
             BridgeMaterial.STONE_SLAB,
-            BridgeMaterial.REPEATER}) {
+            BridgeMaterial.REPEATER}) { // TODO: Why is a repeater ground?? Does it have a collision box?
             if (mat != null) BlockFlags.setFlag(mat, BlockFlags.F_GROUND);
         }
         
         // Moving piston
         setBlockProps(BridgeMaterial.MOVING_PISTON, indestructibleType); // TODO: really?
-        BlockFlags.setFlag(BridgeMaterial.MOVING_PISTON, BlockFlags.F_IGN_PASSABLE | BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT | BlockFlags.FULL_BOUNDS);
+        BlockFlags.setFlag(BridgeMaterial.MOVING_PISTON, BlockFlags.F_IGN_PASSABLE_CHECK | BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT | BlockFlags.FULL_BOUNDS);
 
         // Full block height.
         // Server reports the visible shape 0.9375, client moves on full block height.
+        // TODO: is this needed with the modeling?
         for (final Material mat : new Material[]{BridgeMaterial.FARMLAND}) {
             BlockFlags.setFlag(mat, BlockFlags.F_HEIGHT100);
         }
@@ -1578,7 +1520,7 @@ public class BlockProperties {
         // Ignore for passable.
         for (final Material mat : new Material[] {
             // More strictly needed.
-            // Plates are passable? ...
+            // TODO: Plates are passable? ...
             // ^ They are not, this is part of a workaround
             //@See: https://github.com/Updated-NoCheatPlus/NoCheatPlus/commit/e377abe3427a6f971185fdb9ba2024c1f7803141
             BridgeMaterial.STONE_PRESSURE_PLATE, 
@@ -1586,12 +1528,12 @@ public class BlockProperties {
             BridgeMaterial.SIGN,
             BridgeMaterial.get("DIODE_BLOCK_ON"), 
             BridgeMaterial.get("DIODE_BLOCK_OFF"),}) {
-            if (mat != null) BlockFlags.setFlag(mat, BlockFlags.F_IGN_PASSABLE);
+            if (mat != null) BlockFlags.setFlag(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
         }
 
         // 1.5 high blocks (fences, walls, gates)
         final long flags150 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE | BlockFlags.F_THICK_FENCE;
-        final long flags1502 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE | BlockFlags.F_WALL;
+        final long flags1502 = BlockFlags.F_HEIGHT150 | BlockFlags.F_VARIABLE;
         BlockFlags.setFlag(BridgeMaterial.COBBLESTONE_WALL, flags1502);
         for (final Material mat : new Material[]{BridgeMaterial.NETHER_BRICK_FENCE}) {
             BlockFlags.setFlag(mat, flags150);
@@ -1615,7 +1557,6 @@ public class BlockProperties {
         // Blocks that vary with redstone or interaction.
         for (Material material : Material.values()) {
             if (material.isBlock()) {
-                
                 final String name = material.name().toLowerCase();
                 if (name.endsWith("_door") 
                     || name.endsWith("_trapdoor")
@@ -1661,7 +1602,7 @@ public class BlockProperties {
         BlockFlags.setFlag(BridgeMaterial.END_PORTAL_FRAME, BlockFlags.SOLID_GROUND);
 
         // Cobweb
-        BlockFlags.setFlag(BridgeMaterial.COBWEB, BlockFlags.F_COBWEB | BlockFlags.FULL_BOUNDS | BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.setFlag(BridgeMaterial.COBWEB, BlockFlags.F_COBWEB | BlockFlags.FULL_BOUNDS | BlockFlags.F_IGN_PASSABLE_CHECK);
 
         // Soulsand
         BlockFlags.setFlag(Material.SOUL_SAND, BlockFlags.F_SOULSAND | BlockFlags.SOLID_GROUND);
@@ -1744,7 +1685,7 @@ public class BlockProperties {
             Material.FIRE,}) {
             if (mat != null) {
                 setBlock(mat, instantType);
-                BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE);
+                BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
             }
         }
 
@@ -2063,13 +2004,13 @@ public class BlockProperties {
         }
 
         // Fully solid blocks (shape / passable) - simplifies MCAccessBukkit setup, aim at 1.13+.
-        for (Material mat : MaterialUtil.FULLY_SOLID_BLOCKS) {
+        for (Material mat : MaterialUtil.FUll_BOUNDS_AND_SOLID) {
             BlockFlags.addFlags(mat, BlockFlags.FULL_BOUNDS | BlockFlags.F_SOLID);
         }
 
         // Fully passable blocks.
-        for (Material mat : MaterialUtil.FULLY_PASSABLE_BLOCKS) {
-            BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE);
+        for (Material mat : MaterialUtil.NO_COLLISION_BOX) {
+            BlockFlags.addFlags(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
             BlockFlags.removeFlags(mat, BlockFlags.F_SOLID | BlockFlags.F_GROUND);
         }
     }
@@ -2905,8 +2846,8 @@ public class BlockProperties {
         double liquidHeight;
         final IBlockCacheNode node = access.getOrCreateBlockCacheNode(x, y, z, false);
         final IBlockCacheNode nodeAbove = access.getOrCreateBlockCacheNode(x, y + 1, z, false);
-        final long flags = BlockFlags.getBlockFlags(node.getType());
-        final long aboveFlags = BlockFlags.getBlockFlags(nodeAbove.getType());
+        final long flags = BlockFlags.getBlockFlags(node.getType()) | access.getExtendedData(x, y, z);
+        final long aboveFlags = BlockFlags.getBlockFlags(nodeAbove.getType()) | access.getExtendedData(x, y + 1, z);
         if ((flags & liquidTypeFlag) != 0) {
             if (nodeAbove != null && (aboveFlags & liquidTypeFlag) != 0) {
                 // Same liquid type above, full block height
@@ -2918,7 +2859,7 @@ public class BlockProperties {
             }
             else {
                 // Level-dependant height otherwise
-                final int data = node.getData(access, x, y, z);
+                final int data = (flags & BlockFlags.F_WATERLOGGED) != 0 ? 0 : node.getData(access, x, y, z);
                 if (data >= 8) {
                     liquidHeight = LIQUID_HEIGHT_LOWERED;
                 }
@@ -3088,7 +3029,7 @@ public class BlockProperties {
     public static final boolean isPassable(final Material blockType) {
         final long flags = BlockFlags.getBlockFlags(blockType);
         // TODO: What with non-solid blocks that are not passable ?
-        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE)) != 0) {
+        if ((flags & (BlockFlags.F_LIQUID | BlockFlags.F_IGN_PASSABLE_CHECK)) != 0) {
             return true;
         }
         else {
@@ -3508,55 +3449,6 @@ public class BlockProperties {
             return 0.0;
         }
         else if ((flags & BlockFlags.F_GROUND_HEIGHT) != 0) {
-            // Subsequent min height flags.
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_1) != 0) {
-//                // 1/16
-//                return 0.0625;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT8_1) != 0) {
-//                // 1/8
-//                return 0.125;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT4_1) != 0) {
-//                // 1/4
-//                return 0.25;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_5) != 0) {
-//                // 5/16
-//                return 0.3125;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_7) != 0) {
-//                // 7/16
-//                return 0.4375;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_9) != 0) {
-//                // 9/16
-//                return 0.5625;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT8_5) != 0) {
-//                // 10/16
-//                return 0.625;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_11) != 0) {
-//                // 11/16
-//                return 0.6875;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_13) != 0) {
-//                // 13/16
-//                return 0.8125;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_14) != 0) {
-//                // 14/16
-//                return 0.875;
-//            }
-//            if ((flags & BlockFlags.F_MIN_HEIGHT16_15) != 0) {
-//                // 15/16
-//                return 0.9375;
-//            }
-//            // Default height is used.
-//            if (id == BridgeMaterial.FARMLAND) {
-//                return bounds[4];
-//            }
             // Assume open gates/trapdoors/things to only allow standing on to, if at all.
             if ((flags & BlockFlags.F_PASSABLE_X4) != 0 && (node.getData(access, x, y, z) & 0x04) != 0) {
                 return bounds[4];
@@ -3858,7 +3750,7 @@ public class BlockProperties {
         for (int x = iMinX; x < iMaxX; ++x) {
             for (int y = iMinY; y < iMaxY; ++y) {
                 for (int z = iMinZ; z < iMaxZ; ++z) {
-                    if ((BlockFlags.getBlockFlags(access.getType(x, y, z)) & liquidFlag) != 0) {
+                    if (((BlockFlags.getBlockFlags(access.getType(x, y, z)) | access.getExtendedData(x, y, z)) & liquidFlag) != 0) {
                         return true;
                     }
                 }
@@ -3866,6 +3758,7 @@ public class BlockProperties {
         }
         return false;
     }
+
 
     /**
      * Test if the box collide with any block that matches the flags somehow.
@@ -3971,61 +3864,6 @@ public class BlockProperties {
             for (int z = iMinZ; z <= iMaxZ; z++) {
                 for (int y = iMinY; y <= iMaxY; y++) {
                     if (mat == access.getType(x, y, z)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Check if the given bounding box collides with water logged blocks.
-     *
-     * @param world
-     *            the world
-     * @param access
-     *            the access
-     * @param minX
-     *            the min x
-     * @param minY
-     *            the min y
-     * @param minZ
-     *            the min z
-     * @param maxX
-     *            the max x
-     * @param maxY
-     *            the max y
-     * @param maxZ
-     *            the max z
-     * @return true, if successful
-     */
-    public static final boolean isWaterlogged(final World world, final BlockCache access, 
-                                              final double minX, final double minY, final double minZ, 
-                                              final double maxX, final double maxY, final double maxZ) {
-        if (!Bridge1_13.hasIsSwimming()) return false;
-        final int iMinX = Location.locToBlock(minX);
-        final int iMaxX = Location.locToBlock(maxX);
-        final int iMinY = Location.locToBlock(minY);
-        final int iMaxY = Math.min(Location.locToBlock(maxY), access.getMaxBlockY());
-        final int iMinZ = Location.locToBlock(minZ);
-        final int iMaxZ = Location.locToBlock(maxZ);
-
-        for (int x = iMinX; x <= iMaxX; x++) {
-            for (int z = iMinZ; z <= iMaxZ; z++) {
-                for (int y = iMaxY; y >= iMinY; y--) {
-                    BlockData bd = world.getBlockAt(x,y,z).getBlockData();
-                    if (bd instanceof Waterlogged && ((Waterlogged)bd).isWaterlogged()) {
-                        // Clearly outside of bounds. (liquid)
-                        if (minX > 1.0 + x || maxX < 0.0 + x
-                            || minY > LIQUID_HEIGHT_LOWERED + y || maxY < 0.0 + y
-                            || minZ > 1.0 + z || maxZ < 0.0 + z) {
-                            continue;
-                        }
-                        // Hitting the max-edges (if allowed).
-                        if (minX == 1.0 + x || minY == LIQUID_HEIGHT_LOWERED + y || minZ == 1.0 + z) {
-                            continue;
-                        }
                         return true;
                     }
                 }
@@ -4197,57 +4035,11 @@ public class BlockProperties {
             } 
             else bMaxY = LIQUID_HEIGHT_LOWERED;
         }
-        //else if ((flags & BlockFlags.F_HEIGHT8_1) != 0) {
-        //    bMinY = 0.0;
-        //    bMaxY = 0.125;
-        //}
         else {
             // Auto-fill.
             bMinY = blockBounds[1]; // minY
             bMaxY = blockBounds[4]; // maxY
         }
-        
-        ////////////////////////////
-        // Special cases...       //
-        ////////////////////////////
-        // Fake the blockBounds of thin glass
-        // (Bugged blocks bounds around 1.8. Mojang...)
-        //if ((flags & BlockFlags.F_FAKEBOUNDS) != 0) {
-            // Length / Margin of the blockBounds along the X axis
-        //    final double aaBBLengthZ = bMaxZ - bMinZ;
-            // Length / Margin of the blockBounds along the Z axis
-        //    final double aaBBLengthX = bMaxX - bMinX;
-        //    if (aaBBLengthZ == 0.125 && aaBBLengthX != 1.0) {
-        //        if (bMinX == 0.0) {
-        //            bMaxX = 0.5;
-        //        }
-        //        if (bMaxX == 1.0) {
-        //            bMinX = 0.5;
-        //        }
-        //    } 
-        //    else if (aaBBLengthX == 0.125 && aaBBLengthZ != 1.0) {
-        //        if (bMinZ == 0.0) {
-        //            bMaxZ = 0.5;
-        //        }
-        //        if (bMaxZ == 1.0) {
-        //            bMinZ = 0.5;
-        //        }
-        //    } 
-        //    else if (aaBBLengthX == aaBBLengthZ && aaBBLengthX != 1.0) {
-        //        if (bMaxX == 0.5625) {
-        //            bMaxX = 0.5;
-        //        }
-        //        else if (bMaxZ == 0.5625) {
-        //            bMaxZ = 0.5;
-        //        }
-        //        else if (bMinX == 0.4375) {
-        //            bMinX = 0.5;
-        //        }
-        //        else if (bMinZ == 0.4375) {
-        //            bMinZ = 0.5;
-        //        }
-        //    }
-        //}
         
         //////////////////////////////////
         // Check for collision          //
@@ -4566,7 +4358,6 @@ public class BlockProperties {
         final double[] blockAABB = node.getBounds(access, x, y, z);
         if (blockAABB == null) {
             // Ground flag has been collected, but the block's bounds are null.
-            // Keep looping until we find a collision
             return AlmostBoolean.MAYBE;
         }
         
@@ -4618,7 +4409,7 @@ public class BlockProperties {
         final Material aboveMat = nodeAbove.getType();
         final long aboveFlags = BlockFlags.getBlockFlags(aboveMat);
         // Block above has the IGNORE_PASSABLE flag, so we don't have to check it. (Note for above block check before ground property).
-        if ((aboveFlags & BlockFlags.F_IGN_PASSABLE) != 0) {
+        if ((aboveFlags & BlockFlags.F_IGN_PASSABLE_CHECK) != 0) {
             return AlmostBoolean.YES;
         }
         // Block above is liquid, not solid/ground, or set to not be considered as ground, skip here as well.
@@ -4627,12 +4418,6 @@ public class BlockProperties {
         }
         boolean variable = (flags & BlockFlags.F_VARIABLE) != 0;
         variable |= (aboveFlags & BlockFlags.F_VARIABLE) != 0;
-        // The commented out part below looks wrong.
-        //        // TODO: Keep an eye on this one for exploits.
-        //        if (y != iMaxY && !variable) {
-        //            // Ground found and the block above is passable, no need to check above.
-        //            return AlmostBoolean.YES;
-        //        }
         
         // In case the block above has the GROUND flag, check if it is the same id/material of the collided block (walls)
         if (!variable && id == aboveMat) {
@@ -4709,7 +4494,7 @@ public class BlockProperties {
         for (int x = iMinX; x <= iMaxX; x++) {
             for (int z = iMinZ; z <= iMaxZ; z++) {
                 for (int y = iMinY; y <= iMaxY; y++) {
-                    flags |= BlockFlags.getBlockFlags(access.getType(x, y, z));
+                    flags |= BlockFlags.getBlockFlags(access.getType(x, y, z)) | access.getExtendedData(x, y, z);
                 }
             }
         }
@@ -4847,7 +4632,6 @@ public class BlockProperties {
         }
 
         // TODO: Actual ray-collision checking?
-
         // Check for workarounds.
         // TODO: check f_itchy once exists.
         if (BlockProperties.isPassableWorkaround(access, blockX, blockY, blockZ, oX, oY, oZ, node, dX, dY, dZ,

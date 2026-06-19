@@ -21,6 +21,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
+import fr.neatmonster.nocheatplus.NCPAPIProvider;
 import fr.neatmonster.nocheatplus.checks.CheckType;
 import fr.neatmonster.nocheatplus.checks.combined.Improbable;
 import fr.neatmonster.nocheatplus.checks.moving.MovingConfig;
@@ -37,7 +38,6 @@ import fr.neatmonster.nocheatplus.utilities.TickTask;
 import fr.neatmonster.nocheatplus.utilities.location.PlayerLocation;
 import fr.neatmonster.nocheatplus.utilities.map.BlockCache;
 import fr.neatmonster.nocheatplus.utilities.map.BlockProperties;
-import fr.neatmonster.nocheatplus.utilities.map.MaterialUtil;
 import fr.neatmonster.nocheatplus.utilities.math.MathUtil;
 import fr.neatmonster.nocheatplus.utilities.moving.Magic;
 import fr.neatmonster.nocheatplus.utilities.moving.MovingUtil;
@@ -86,12 +86,7 @@ public class LostGround {
         }
         
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
-        // Very specific case with players jumping with head obstructed by lanterns or after respawning
-        // TODO: Is this still relevant? (Likely not)
-        if (hDistance <= Magic.Minecraft_minMoveSqDistance && from.isOnGround(Magic.Minecraft_minMoveSqDistance)
-            && (MaterialUtil.LANTERNS.contains(from.getBlockType(from.getBlockX(), Location.locToBlock(from.getY() + 2.0), from.getBlockZ())) || data.joinOrRespawn)) {
-            return applyLostGround(player, from, true, thisMove, data, "0.03", tags);
-        }
+        // TODO: Really?
         if (!MathUtil.inRange(0.0001, hDistance, 1.5)) { 
             // Lost ground only happens with enough horizontal motion and not too much either.
             return false;
@@ -161,10 +156,7 @@ public class LostGround {
     /**
      * Vertical collision with ground on client side, shifting over an edge with
      * the horizontal move. Needs last move data.
-     * @See <a href="https://gyazo.com/5613ce5ab7bbb88b760c6b6e67fe35f4">
-     * This screenshot for a visual representation of what's happening. </a> 
-     * @See <a href="https://gyazo.com/744b4bbd1e5e118ef99d4435df4490a1">Also this.</a> 
-     * 
+     *
      * @param player
      * @param blockCache
      * @param world
@@ -172,23 +164,23 @@ public class LostGround {
      * @param tags
      * @param tag
      * @param data
-     * @param thisX 
-     *           Player's most recent coordinates...
+     * @param thisX               Player's most recent coordinates...
      * @param thisY
      * @param thisZ
-     * @param lastX 
-     *           Player's last coordinates...
+     * @param lastX               Player's last coordinates...
      * @param lastY
      * @param lastZ
      * @param lastHDistance
-     * @param boxMarginHorizontal
-     *           AABB horizontal width at some resolution
+     * @param boxMarginHorizontal AABB horizontal width at some resolution
      * @param yOnGround
      * @return
+     * @See <a href="https://gyazo.com/5613ce5ab7bbb88b760c6b6e67fe35f4">
+     * This screenshot for a visual representation of what's happening. </a>
+     * @See <a href="https://gyazo.com/744b4bbd1e5e118ef99d4435df4490a1">Also this.</a>
      */
-    private static boolean interpolateGround(final Player player, final BlockCache blockCache, final World world, 
-                                             final MCAccess mcAccess, final Collection<String> tags, final String tag, final MovingData data, final double thisX, final double thisY, 
-                                             final double thisZ, double lastX, final double lastY, 
+    private static boolean interpolateGround(final Player player, final BlockCache blockCache, final World world,
+                                             final MCAccess mcAccess, final Collection<String> tags, final String tag, final MovingData data, final double thisX, final double thisY,
+                                             final double thisZ, double lastX, final double lastY,
                                              double lastZ, final double lastHDistance, final double boxMarginHorizontal, final double yOnGround) {
         // First: calculate vector towards last from.
         lastX -= thisX;
@@ -212,7 +204,9 @@ public class LostGround {
         // (We don't add another xz-margin here, as the move should cover ground.)
         if (BlockProperties.isOnGroundShuffled(world, blockCache, thisX, thisY, thisZ, lastX, thisY, lastZ, boxMarginHorizontal, yOnGround, 0.0)) {
             // NOTE: data.fromY for set back is not correct, but currently it is more safe (needs instead: maintain a "distance to ground").
-            return applyLostGround(player, new Location(world, lastX, lastY, lastZ), true, data.playerMoves.getCurrentMove(), data, "interpolate" + tag, tags, mcAccess);
+            PlayerLocation pLoc = new PlayerLocation(NCPAPIProvider.getNoCheatPlusAPI().getGenericInstanceHandle(MCAccess.class), blockCache);
+            pLoc.set(new Location(world, lastX, lastY, lastZ), player);
+            return applyLostGround(player, pLoc, true, data.playerMoves.getCurrentMove(), data, "interpolate" + tag, tags);
         } 
         return false;
     }
@@ -221,26 +215,23 @@ public class LostGround {
     /**
      * Vertical collision with ground on client side, shifting over an edge with
      * the horizontal move. Needs last move data.
-     * 
+     *
      * @param player
      * @param blockCache
      * @param world
      * @param tag
      * @param data
-     * @param thisX
-     *            Target's current coordinates...
+     * @param thisX               Target's current coordinates...
      * @param thisY
      * @param thisZ
-     * @param lastMove 
-     *            Last move's coordinates...
-     * @param boxMarginHorizontal
-     *            Center to edge, at some resolution.
+     * @param lastMove            Last move's coordinates...
+     * @param boxMarginHorizontal Center to edge, at some resolution.
      * @param yOnGround
      * @return
      */
-    private static boolean interpolateGround(final Player player, final BlockCache blockCache, final World world, final MCAccess mcAccess, final String tag, 
-                                             final Collection<String> tags, final MovingData data, final double thisX, 
-                                             final double thisY, final double thisZ, final PlayerMoveData lastMove, final double boxMarginHorizontal, 
+    private static boolean interpolateGround(final Player player, final BlockCache blockCache, final World world, final MCAccess mcAccess, final String tag,
+                                             final Collection<String> tags, final MovingData data, final double thisX,
+                                             final double thisY, final double thisZ, final PlayerMoveData lastMove, final double boxMarginHorizontal,
                                              final double yOnGround) {
         return interpolateGround(player, blockCache, world, mcAccess, tags, tag, data, thisX, thisY, thisZ, lastMove.from.getX(), lastMove.from.getY(), lastMove.from.getZ(), lastMove.hDistance, boxMarginHorizontal, yOnGround);
     }
@@ -248,23 +239,24 @@ public class LostGround {
 
     /**
      * Apply lost-ground workaround (data adjustments and tag).
-     * 
+     *
      * @param player
      * @param thisMove
      * @param data
-     * @param tag Added to "lostground_" as tag.
+     * @param tag      Added to "lostground_" as tag.
      * @param tags
      * @param mcAccess
+     * @param from
      * @return Always true.
      */
-    private static boolean applyLostGround(final Player player, final PlayerMoveData thisMove, final MovingData data, final String tag, 
-                                           final Collection<String> tags, final MCAccess mcAccess) {
+    private static boolean applyLostGround(final Player player, final PlayerMoveData thisMove, final MovingData data, final String tag,
+                                           final Collection<String> tags, final MCAccess mcAccess, PlayerLocation from) {
         // Reset the jumpPhase.
         data.sfJumpPhase = 0;
         // Update the jump amplifier because we assume the player to be able to jump here.
         data.jumpAmplifier = MovingUtil.getJumpAmplifier(player, mcAccess);
         // Update speed factors the speed estimation.
-        data.adjustMediumProperties(player.getLocation(), DataManager.getPlayerData(player).getGenericInstance(MovingConfig.class), player, data.playerMoves.getCurrentMove());
+        data.adjustMediumProperties(player, from);
         // Tell NoFall that we assume the player to have been on ground somehow.
         thisMove.touchedGround = true;
         thisMove.touchedGroundWorkaround = true;
@@ -280,44 +272,18 @@ public class LostGround {
 
     /**
      * Apply lost-ground workaround.
-     * 
+     *
      * @param player
-     * @param refLoc (Bukkit Location)
-     * @param setBackSafe If to use the given location as set back location.
-     * @param thisMove
-     * @param data
-     * @param tag Added to "lostground_" as tag.
-     * @param tags
-     * @param mcAccess
-     * @return Always true.
-     */
-    private static boolean applyLostGround(final Player player, final Location refLoc, final boolean setBackSafe, 
-                                           final PlayerMoveData thisMove, final MovingData data, final String tag, 
-                                           final Collection<String> tags, final MCAccess mcAccess) {
-        if (setBackSafe) {
-            data.setSetBack(refLoc);
-        }
-        else {
-            // Keep Set back.
-        }
-        return applyLostGround(player, thisMove, data, tag, tags, mcAccess);
-    }
-
-
-    /**
-     * Apply lost-ground workaround.
-     * 
-     * @param player
-     * @param refLoc (PlayerLocation)
+     * @param refLoc      (PlayerLocation)
      * @param setBackSafe If to use the given location as set back.
      * @param thisMove
      * @param data
-     * @param tag Added to "lostground_" as tag.
+     * @param tag         Added to "lostground_" as tag.
      * @param tags
      * @return Always true.
      */
-    private static boolean applyLostGround(final Player player, final PlayerLocation refLoc, final boolean setBackSafe, 
-                                           final PlayerMoveData thisMove, final MovingData data, final String tag, 
+    private static boolean applyLostGround(final Player player, final PlayerLocation refLoc, final boolean setBackSafe,
+                                           final PlayerMoveData thisMove, final MovingData data, final String tag,
                                            final Collection<String> tags) {
         // Set the new setBack and reset the jumpPhase.
         if (setBackSafe) {
@@ -326,6 +292,6 @@ public class LostGround {
         else {
             // Keep Set back.
         }
-        return applyLostGround(player, thisMove, data, tag, tags, refLoc.getMCAccess());
+        return applyLostGround(player, thisMove, data, tag, tags, refLoc.getMCAccess(), refLoc);
     }
 }

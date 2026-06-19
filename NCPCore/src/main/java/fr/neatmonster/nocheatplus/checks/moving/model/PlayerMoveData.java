@@ -17,11 +17,11 @@ package fr.neatmonster.nocheatplus.checks.moving.model;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.util.Vector;
 
+import fr.neatmonster.nocheatplus.checks.moving.player.HiddenMotionReconstructor;
 import fr.neatmonster.nocheatplus.checks.moving.velocity.SimpleEntry;
 import fr.neatmonster.nocheatplus.compat.AlmostBoolean;
 
@@ -40,10 +40,10 @@ public class PlayerMoveData extends MoveData {
     /** Player action set on {@link org.bukkit.event.player.PlayerMoveEvent}. NOTE: this is NOT the toggle glide moment, but the entire gliding phase. */
     public boolean isGliding;
     
-    /** Represents how far the player is submerged in lava. Set with {@link fr.neatmonster.nocheatplus.utilities.map.BlockProperties#getVerticalFrictionFactor(LivingEntity, Location, double, PlayerMoveData)} */
+    /** Represents how far the player is submerged in lava. Set with {@link fr.neatmonster.nocheatplus.utilities.map.BlockProperties#getVerticalFrictionFactor(LivingEntity, fr.neatmonster.nocheatplus.utilities.location.PlayerLocation)} */
     public double submergedLavaHeight;
     
-    /** Represents how far the player is submerged in water. Set with {@link fr.neatmonster.nocheatplus.utilities.map.BlockProperties#getVerticalFrictionFactor(LivingEntity, Location, double, PlayerMoveData)} */
+    /** Represents how far the player is submerged in water. Set with {@link fr.neatmonster.nocheatplus.utilities.map.BlockProperties#getVerticalFrictionFactor(LivingEntity, fr.neatmonster.nocheatplus.utilities.location.PlayerLocation)} */
     public double submergedWaterHeight;
     
     /** A flag to indicate that the player is currenrtly lunging forward due to left clicking with a Spear in hand with Lunge enchantement. Set in CombatListener. */
@@ -92,6 +92,31 @@ public class PlayerMoveData extends MoveData {
      */
     public boolean hasAttackSlowDown;
 
+    /**
+     * Set when {@code maybeBackOffFromEdge} ran this tick (shift + above ground).
+     * Used for sneak-edge corner recovery in SurvivalFly.
+     */
+    public boolean edgeBackoffApplied;
+
+    /**
+     * Set when edge backoff reduced at least one horizontal axis this tick ({@code preEdge != backOff}).
+     */
+    public boolean edgeAxisClamped;
+
+    /**
+     * Set when edge backoff clipped both X and Z on at least one brute candidate (block corner).
+     */
+    public boolean edgeCornerClamp;
+
+    /**
+     * Set when a corner candidate was matched and applied this tick ({@link SurvivalFly}).
+     */
+    public boolean edgeCornerResolved;
+
+    public double motionX;
+    /** Slime: last tick modeled {@code yBC}; chains as seed when packet {@code yDistance == 0} until leaving slime. */
+    public double motionY;
+    public double motionZ;
 
     // Bounds set by checks.
     /**
@@ -113,37 +138,81 @@ public class PlayerMoveData extends MoveData {
      * during processing of moving checks.
      */
     public double zAllowedDistance;
+    
     /**
-     * Index from input brute force table that distance less than 0.03 <br>
-     * Taken into account after non match and will assume player use that input
+     * Index (0..8) into the 9-element WASD candidate arrays used by
+     * {@code SurvivalFly} when client inputs are unknown. The index selects which
+     * WASD candidate (combination of strafe/forward) produced a final
+     * post-collision horizontal displacement that falls below the client's
+     * movement-send suppression threshold (and therefore could have been
+     * "hidden" / not sent by the client).
+     *
+     * <p>Semantics and usage:
+     * <ul>
+     *   <li>Set during the candidate loop in {@code SurvivalFly} whenever a
+     *       candidate's post-collision displacement is below the suppression
+     *       threshold; {@code -1} means "no candidate recorded". If multiple
+     *       candidates match, the last matching index overwrites earlier ones.</li>
+     *   <li>When non-negative, this index is used immediately (in the same
+     *       tick) to seed {@link fr.neatmonster.nocheatplus.checks.moving.player.HiddenMotionReconstructor#findBestHiddenTickExplanation}.
+     *       The reconstructor attempts to explain the observed movement by
+     *       simulating additional hidden ticks and returns cumulative
+     *       displacements which are stored in the "corrected distance" fields
+     *       (e.g. {@code xCorrectedDistancePre/Post}).</li>
+     *   <li>The returned corrected distances are applied either as a starting
+     *       allowed momentum for the following tick ({@code xCorrectedDistancePre})
+     *       or folded into candidate computations for the current tick
+     *       ({@code xCorrectedDistancePost}). A special-case "hdistzero" stores
+     *       post-corrections when the observed move has zero displacement.</li>
+     * </ul>
+     * <p>In short: this field identifies the WASD candidate used as the seed for
+     * hidden-tick reconstruction. It is not the corrected distance itself (the
+     * reconstructor computes that); it only points to which candidate was used.</p>
      */
     public int hiddenDistanceIndex;
+    
+    public int hiddenYDistanceIndex;
+    
     /**
      * Is there stop motion during/after hidden move happening? <br>
      * VOLATILE by design and should not be use elsewhere
      */
     public boolean possibleStopMotion;
+    
     /**
-     * Corrected motion for the next move to use. <br>
-     * There are 2 sources of this: hidden move and stop motion. <br>
-     * Do note that it is not always right if there more than one correct result of the sum, that make next move become unpredictable
+     * Corrected X displacement computed for the previous move by the hidden-tick
+     * reconstructor.
+     *
+     * Used as the starting horizontal momentum on the next tick (replaces the
+     * usual lastMove.xDistance). Set to 0.0 after it is applied or when not
+     * needed.
      */
     public double xCorrectedDistancePre;
+
     /**
-     * Corrected motion for the next move to use. <br>
-     * There are 2 sources of this: hidden move and stop motion. <br>
-     * Do note that it is not always right if there more than one correct result of the sum, that make next move become unpredictable
+     * Mirror of {@link #xCorrectedDistancePre} for the Y axis.
+     */
+    public double yCorrectedDistancePre;
+    
+    /**
+     * Corrected Z displacement computed for the previous move by the
+     * hidden-tick reconstructor. Applied the same way as
+     * {@link #xCorrectedDistancePre} but for the Z axis.
      */
     public double zCorrectedDistancePre;
+    
     /**
-     * Additive motion for the end of next move to use. Borrow and return effect. <br>
-     * There are 2 sources of this: hidden move and ground riptide.
+     * Post-correction X displacement. When a hidden candidate exists but the
+     * observed move has zero displacement (or similar cases), the reconstructor
+     * result can be stored here and added to theoretical candidate distances in
+     * the next calculations. This is a temporary holder and is cleared when
+     * consumed.
      */
-    // TODO: Use this to handle ground riptide, cleaner code
     public double xCorrectedDistancePost;
+    
     /**
-     * Additive motion for the end of next move to use. Borrow and return effect. <br>
-     * There are 2 sources of this: hidden move and ground riptide.
+     * Post-correction Z displacement. Works like {@link #xCorrectedDistancePost}
+     * but for the Z axis.
      */
     public double zCorrectedDistancePost;
 
@@ -185,7 +254,19 @@ public class PlayerMoveData extends MoveData {
     
     /** Highly uncertain movement: player might step up with this movement; we cannot know for sure. Set with lost-ground couldstep */
     public boolean couldStepUp;
-    
+
+    /**
+     * Client onGround for this segment (flying packet on packet-split, or {@link org.bukkit.entity.Player#isOnGround()} otherwise).
+     */
+    public boolean hasClientFromOnGround;
+    public boolean clientFromOnGround;
+    public boolean hasClientToOnGround;
+    public boolean clientToOnGround;
+    /**
+     * To-packet horizontal collision (1.21.3+ protocol). Only consumed on the non-brute (WASD-known) path.
+     */
+    public boolean hasClientToHorizontalCollision;
+    public boolean clientToHorizontalCollision;
 
     // Meta stuff.
     /**
@@ -267,6 +348,13 @@ public class PlayerMoveData extends MoveData {
     protected void resetBase() {
         // Properties of the player.
         hasAttackSlowDown = false;
+        edgeBackoffApplied = false;
+        edgeAxisClamped = false;
+        edgeCornerClamp = false;
+        edgeCornerResolved = false;
+        motionX = 0.0;
+        motionY = 0.0;
+        motionZ = 0.0;
         submergedLavaHeight = 0.0;
         submergedWaterHeight = 0.0;
         isGliding = false;
@@ -277,13 +365,18 @@ public class PlayerMoveData extends MoveData {
         isStepUp = false;
         isJump = false;
         couldStepUp = false;
+        hasClientFromOnGround = false;
+        hasClientToOnGround = false;
+        hasClientToHorizontalCollision = false;
         // Bounds set by checks.
         xAllowedDistance = 0.0;
         yAllowedDistance = 0.0;
         zAllowedDistance = 0.0;
         hiddenDistanceIndex = -1;
+        hiddenYDistanceIndex = -1;
         possibleStopMotion = false;
         xCorrectedDistancePre = 0.0;
+        yCorrectedDistancePre = 0.0;
         zCorrectedDistancePre = 0.0;
         xCorrectedDistancePost = 0.0;
         zCorrectedDistancePost = 0.0;

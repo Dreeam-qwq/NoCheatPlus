@@ -279,21 +279,6 @@ public class RichEntityLocation extends RichBoundsLocation {
         return super.isOnBlueIce();
     }
     
-    /** 
-     * @return Always false for 1.12 and below.
-     */
-    public boolean isInWaterLogged() {
-        if (inWaterLogged != null) {
-            return inWaterLogged;
-        }
-        if (GenericVersion.isLowerThan(entity, "1.13")) {
-            // Waterlogged blocks don't exist for older clients.
-            inWaterLogged = false;
-            return inWaterLogged;
-        }
-        return super.isInWaterLogged();
-    }
-    
     /**
      * @return Always false for 1.12 and below.
      */
@@ -335,23 +320,25 @@ public class RichEntityLocation extends RichBoundsLocation {
         if (inLava != null) {
             return inLava;
         }
-        // 1.13 and below clients use this no-sense method to check if the player is in lava
+        // 1.13 and below use this extra contraction for lava collision.
         // 1.8 client, Entity.java -> handleLavaMovement() -> isMaterialInBB in World.java
         if (GenericVersion.isLowerThan(entity, "1.14")) {
             // Force-override the inLava result from RichBoundsLocation.
             inLava = false;
-            double[] aaBB = getBoundingBox();
-            int iMinX = MathUtil.floor(aaBB[0] + 0.1);
-            int iMaxX = MathUtil.floor(aaBB[3] - 0.1 + 1.0);
-            int iMinY = MathUtil.floor(aaBB[1] + 0.4);
-            int iMaxY = MathUtil.floor(aaBB[4] - 0.4 + 1.0);
-            int iMinZ = MathUtil.floor(aaBB[2] + 0.1);
-            int iMaxZ = MathUtil.floor(aaBB[5] - 0.1 + 1.0);
+            double extraContraction = 0.4;
+            final int iMinX = MathUtil.floor(minX + 0.001);
+            final int iMaxX = MathUtil.ceil(maxX - 0.001);
+            final int iMinY = MathUtil.floor(minY + 0.001 + extraContraction); 
+            final int iMaxY = MathUtil.ceil(maxY - 0.001 - extraContraction);
+            final int iMinZ = MathUtil.floor(minZ + 0.001);
+            final int iMaxZ = MathUtil.ceil(maxZ - 0.001);
+            // NMS collision method
             for (int x = iMinX; x < iMaxX; x++) {
                 for (int y = iMinY; y < iMaxY; y++) {
                     for (int z = iMinZ; z < iMaxZ; z++) {
-                        final IBlockCacheNode node = blockCache.getOrCreateBlockCacheNode(x, y, z, false);
-                        if ((BlockFlags.getBlockFlags(node.getType()) & BlockFlags.F_LAVA) != 0) {
+                        double liquidHeight = BlockProperties.getLiquidHeightAt(blockCache, x, y, z, BlockFlags.F_LAVA, true);
+                        if (iMaxY >= y + 1 - liquidHeight && liquidHeight != 0.0) {
+                            // Collided.
                             inLava = true;
                             return inLava;
                         }
@@ -396,8 +383,7 @@ public class RichEntityLocation extends RichBoundsLocation {
                 for (int y = iMinY; y < iMaxY; y++) {
                     for (int z = iMinZ; z < iMaxZ; z++) {
                         double liquidHeight = BlockProperties.getLiquidHeightAt(blockCache, x, y, z, BlockFlags.F_WATER, true);
-                        double liquidHeightToWorld = y + liquidHeight;
-                        if (liquidHeightToWorld >= minY + 0.001 + extraContraction && liquidHeight != 0.0) {
+                        if (iMaxY >= y + 1 - liquidHeight && liquidHeight != 0.0) {
                             // Collided.
                             inWater = true;
                             return inWater;
@@ -567,7 +553,7 @@ public class RichEntityLocation extends RichBoundsLocation {
      * 
      * @return True, if the moved bounding box is free from obstructions, otherwise false.
      */
-    public boolean isUnobstructed() {
+    public boolean isUnobstructed(double yDistance) {
         final IPlayerData pData = DataManager.getPlayerDataForEntity(entity, passengerUtil);
         final MovingData data = pData.getGenericInstance(MovingData.class);
         final PlayerMoveData thisMove = data.playerMoves.getCurrentMove();
@@ -575,7 +561,7 @@ public class RichEntityLocation extends RichBoundsLocation {
         // Un-comment this once x/y/zAllowedDistances is shared with vehicles too in MoveData, and we have a prediction for vehicles.
         // final VehicleMoveData vehicleMove = data.vehicleMoves.getCurrentMove();
         // final VehicleMoveData lastVehicleMove = data.vehicleMoves.getFirstPastMove();
-        return isUnobstructed(thisMove.xAllowedDistance, thisMove.yAllowedDistance+0.6-lastMove.to.getY()+lastMove.from.getY(), thisMove.zAllowedDistance, isInWater() ? BlockFlags.F_WATER : BlockFlags.F_LAVA);
+        return isUnobstructed(thisMove.xAllowedDistance, yDistance+0.6-lastMove.to.getY()+lastMove.from.getY(), thisMove.zAllowedDistance, isInWater() ? BlockFlags.F_WATER : BlockFlags.F_LAVA);
     }
     
     /**
@@ -621,7 +607,7 @@ public class RichEntityLocation extends RichBoundsLocation {
         boolean collideX = wantedInput.getX() != allowedMovement.getX();
         boolean collideY = wantedInput.getY() != allowedMovement.getY();
         boolean collideZ = wantedInput.getZ() != allowedMovement.getZ();
-        boolean touchGround = onGround || collideY && allowedMovement.getY() < 0.0; // Already on ground. Or this downward movement would result in the player touching the ground.
+        boolean touchGround = onGround || collideY && wantedInput.getY() < 0.0; // Already on ground. Or this downward movement would result in the player touching the ground.
         /* 
           Players can step blocks up to 0.6 or 0.5, depending on the client version (if older than 1.8). Boats cannot step. All other vehicles can step a whole block up.
            TODO: Make attributes accessible to entities as well.

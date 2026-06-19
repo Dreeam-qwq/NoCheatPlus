@@ -184,6 +184,28 @@ public class MathUtil {
         }
         return closestIdx;
     }
+
+    /**
+     * Index of the (x, z) pair whose horizontal distance to the target is smallest.
+     */
+    public static int findClosestHorizontalIndex(final double[] xArr, final double[] zArr,
+            final double targetX, final double targetZ) {
+        if (xArr == null || zArr == null || xArr.length == 0 || xArr.length != zArr.length) {
+            throw new IllegalArgumentException("x/z arrays must be non-null and equal length.");
+        }
+        double minDistSq = Double.POSITIVE_INFINITY;
+        int closestIdx = 0;
+        for (int i = 0; i < xArr.length; i++) {
+            final double dx = xArr[i] - targetX;
+            final double dz = zArr[i] - targetZ;
+            final double distSq = dx * dx + dz * dz;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                closestIdx = i;
+            }
+        }
+        return closestIdx;
+    }
     
     /**
      * Seconds to ms.

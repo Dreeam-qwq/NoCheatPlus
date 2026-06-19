@@ -163,5 +163,8 @@ public class BlockCacheSpigotCB1_12_R1 extends BlockCache {
         world = null;
         bukkitWorld = null;
     }
-
+    @Override
+    public long fetchExtendedData(int x, int y, int z) {
+        return 0;
+    }
 }

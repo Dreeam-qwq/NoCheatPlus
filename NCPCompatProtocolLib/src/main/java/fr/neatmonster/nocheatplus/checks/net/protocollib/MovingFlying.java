@@ -35,6 +35,7 @@ import com.comphenix.protocol.reflect.StructureModifier;
 
 import fr.neatmonster.nocheatplus.NCPAPIProvider;
 import fr.neatmonster.nocheatplus.checks.CheckType;
+import fr.neatmonster.nocheatplus.checks.moving.MovingData;
 import fr.neatmonster.nocheatplus.checks.net.FlyingFrequency;
 import fr.neatmonster.nocheatplus.checks.net.Moving;
 import fr.neatmonster.nocheatplus.checks.net.NetConfig;
@@ -301,6 +302,18 @@ public class MovingFlying extends BaseAdapter {
             && wrongTurn.check(player, packetData.getPitch(), data, cc)
             && !pData.hasBypass(CheckType.NET_WRONGTURN, player)) {
             cancel = true; // Is it a good idea to cancel or should we just reset the players pitch?
+        }
+        if (!cancel && pData.isCheckActive(CheckType.MOVING_NOFALL, player)) {
+            final MovingData mData = pData.getGenericInstance(MovingData.class);
+            final float noFallFallDistance = mData.noFallFallDistance;
+            if (mData.requestTrueForGround) {
+                // If damage has already dealt
+                if (noFallFallDistance > 0.0) {
+                    player.setFallDistance(noFallFallDistance);
+                    event.getPacket().getBooleans().write(indexOnGround, mData.requestTrueForGround);
+                }
+                mData.requestTrueForGround = false;
+            }
         }
 
         // Process cancel and debug log.

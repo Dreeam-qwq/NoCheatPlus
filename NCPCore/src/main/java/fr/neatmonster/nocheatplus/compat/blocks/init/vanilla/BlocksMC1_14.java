@@ -124,13 +124,13 @@ public class BlocksMC1_14 implements BlockPropertiesSetup{
         BlockProperties.setBlockProps("BAMBOO_SAPLING", new BlockProperties.BlockProps(BlockProperties.woodSword, 1f));
 
         BlockFlags.addFlags("BAMBOO", BlockFlags.F_GROUND);
-        BlockFlags.addFlags("BAMBOO_SAPLING", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("BAMBOO_SAPLING", BlockFlags.F_IGN_PASSABLE_CHECK);
 
-        BlockFlags.addFlags("WITHER_ROSE", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("WITHER_ROSE", BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockProperties.setBlockProps("WITHER_ROSE", instant);        
-        BlockFlags.addFlags("CORNFLOWER", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("CORNFLOWER", BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockProperties.setBlockProps("CORNFLOWER", instant);
-        BlockFlags.addFlags("LILY_OF_THE_VALLEY", BlockFlags.F_IGN_PASSABLE);
+        BlockFlags.addFlags("LILY_OF_THE_VALLEY", BlockFlags.F_IGN_PASSABLE_CHECK);
         BlockProperties.setBlockProps("LILY_OF_THE_VALLEY", instant);
 
         // More signs

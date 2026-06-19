@@ -68,7 +68,7 @@ public class BlocksMC1_13 implements BlockPropertiesSetup {
         for (Material mat : MaterialUtil.DEAD_CORAL_PARTS) {
             // (Flags should be set correctly by default.)
             BlockProperties.setBlockProps(mat, BlockProperties.instantType);
-            BlockFlags.setBlockFlags(mat, BlockFlags.F_IGN_PASSABLE);
+            BlockFlags.setBlockFlags(mat, BlockFlags.F_IGN_PASSABLE_CHECK);
         }
 
         // Water plants
@@ -77,8 +77,9 @@ public class BlocksMC1_13 implements BlockPropertiesSetup {
         }
 
         // Bubble column.
-        BlockInit.setAs("BUBBLE_COLUMN", Material.WATER); // TODO: not correct. Bubble columns are liquids but don't behave like water.
-        BlockFlags.addFlags("BUBBLE_COLUMN", BlockFlags.F_BUBBLE_COLUMN); 
+        BlockInit.setAs("BUBBLE_COLUMN", Material.WATER);
+        // Like water but don't have flag F_HEIGHT_8SIM_DEC
+        BlockFlags.setBlockFlags("BUBBLE_COLUMN", BlockFlags.F_BUBBLE_COLUMN | BlockFlags.F_LIQUID | BlockFlags.F_WATER);
 
         // Further melon/pumpkin stems.
 
@@ -195,7 +196,7 @@ public class BlocksMC1_13 implements BlockPropertiesSetup {
         
         // Sea Pickle.
         BlockProperties.setBlockProps("SEA_PICKLE", BlockProperties.instantType);
-        BlockFlags.addFlags("SEA_PICKLE", BlockFlags.F_GROUND | BlockFlags.F_GROUND_HEIGHT);
+        BlockFlags.addFlags("SEA_PICKLE", BlockFlags.F_GROUND);
 
         // Turtle egg.
         BlockProperties.setBlockProps("TURTLE_EGG", new BlockProps(BlockProperties.noTool, 0.5f));
