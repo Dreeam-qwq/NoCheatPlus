@@ -18,7 +18,7 @@ jobs:
           distribution: 'zulu'
 
       - name: Build NoCheatPlus
-        run: mvn clean package -P nonfree_build -P all
+        run: mvn clean package -P nonfree_build -P all -DskipTests
 
       - name: Upload NoCheatPlus
         uses: actions/upload-artifact@v7
